@@ -2,7 +2,6 @@ const WebSocket = require("ws");
 
 // _mkWebsocket :: String -> Effect WebSocket
 exports._mkWebSocket = url => () => {
-  console.log("Starting websocket attempt");
   const ws = new WebSocket(url, { perMessageDeflate: false });
   console.log("new websocket");
   return ws;
@@ -35,13 +34,19 @@ exports._wsSend = ws => str => () => {
   ws.send(str);
 }
 
+// safely but asynchronously close the connection
 // _wsClose :: WebSocket -> Effect Unit
 exports._wsClose = ws => () => ws.close()
+
+// immediately close connection
+// _wsTerminate :: Websocket -> Effect Unit
+exports._wsTerminate = ws => () => ws.terminate()
 
 // _stringify :: a -> Effect String
 exports._stringify = a => () => JSON.stringify(a)
 
 // Every 30 seconds if we haven't heard from the server, sever the connection.
+// There is a chance this will leak due to not removing listeners, in this case it should take the purescript function `discardOgmiosWebSocket`, fully applied as a lazy parameter and use it instead of `ws.terminate()`
 // heartbeat :: WebSocket -> Int -> Effect Unit-> ImplicitUnsafeEffect Int
 const heartbeat = ws => id => onError => {
   console.log("websocket heartbeat fired")
@@ -63,5 +68,5 @@ exports._wsWatch = ws => onError => () => {
   ws.on('open', heartbeatAndCount)
   ws.on('ping', heartbeatAndCount)
   ws.on('pong', heartbeatAndCount)
-  ws.on('close', () => clearTimeout(id))
+  ws.on('close', () => clearTimeout(counter))
 }

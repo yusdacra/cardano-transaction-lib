@@ -7,7 +7,8 @@ import Data.Array (index)
 import Data.BigInt as BigInt
 import Data.Either(Either(..), hush, note)
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
+import Data.Int as Int
+import Data.Show.Generic(genericShow)
 import Data.Maybe (Maybe)
 import Data.Foldable (foldl)
 import Data.Map as Map
@@ -19,17 +20,20 @@ import Types.Transaction (Value(..), CurrencySymbol(..), TokenName(..))
 foreign import _uniqueId :: String -> Effect String
 
 -- denotes which query (Utxo, tx, datum, etc) we are making
-data QueryType = UTXO
+data QueryType 
+  = UTXO
+  | Tx
 
 derive instance genericQueryType :: Generic QueryType _
 
 instance showQueryType :: Show QueryType where
   show a = genericShow a 
 
-
 --  the Address type in `Types.Transaction` is quite a bit more complex than 
 --  this
 type Address = String
+
+type TxId = String
 
 -- these types are described in: https://ogmios.dev/getting-started/basics/ 
 
@@ -50,6 +54,9 @@ type Mirror = { step :: String, id :: String }
 mkUtxosAtQuery :: UtxoQueryParams -> Effect (JsonWspRequest (QueryArgs UtxoQueryParams))
 mkUtxosAtQuery uqp = mkJsonWspQuery uqp UTXO
 
+mkTxQuery :: TxQueryParams -> Effect (JsonWspRequest (QueryArgs TxQueryParams))
+mkTxQuery tqp = mkJsonWspQuery tqp Tx
+
 -- this is polymorphic over the queryArgs even though QueryType should make them
 -- concrete,  we could have some kind of lawless typeclass do this,
 -- but here we've chosen to just provide concrete impls where we want to support it
@@ -68,6 +75,8 @@ mkJsonWspQuery a qt = do
 
 -- the actual query description
 type UtxoQueryParams = { utxo :: Array Address }
+
+type TxQueryParams = { transaction :: Array TxId }
 
 -- used as a wrapper for all Queries
 type QueryArgs a = { query :: a }
@@ -107,17 +116,17 @@ parseFieldToString :: Object Json -> String -> Either JsonDecodeError String
 parseFieldToString o str = 
   caseJsonString (Left (TypeMismatch ("expected field: '" <> str <> "' as a String"))) Right =<< getField o str
 
--- parses the number at the given field to a bigint
+-- parses the number at the given field to a 32 bit signed integer
 -- danger: Because argonaut has already parsed this as a Json foreign, it may
 -- already be a javascript 'number' type. if that number is not safely representable
 -- then we may have already lost precision. we may need a bigint preprocessor on json if this is the case: Because argonaut has already parsed this as a Json foreign, it may
 -- already be a javascript 'number' type. if that number is not safely representable
 -- then we may have already lost precision. we may need a bigint preprocessor on json if this is the case.
-parseFieldToInt :: Object Json -> String -> Either JsonDecodeError BigInt.BigInt
+parseFieldToInt :: Object Json -> String -> Either JsonDecodeError Int
 parseFieldToInt o str = do
   let err = TypeMismatch $ "expected field: '" <> str <> "' as an Int"
   num <- caseJsonNumber (Left err) Right =<< getField o str
-  int <- note err $ BigInt.fromNumber num
+  int <- note err $ Int.fromNumber num
   pure int
 
 -- parses a string at the given field to a BigInt
@@ -141,10 +150,18 @@ parseMirror = caseJsonObject (Left (TypeMismatch "expected object")) $
 -- appropriate instances to work with `parseJsonWspResponse`
 newtype UtxoQR = UtxoQR UtxoQueryResult
 
+
 derive newtype instance showUtxoQR :: Show UtxoQR
 
 instance decodeJsonUtxoQR :: DecodeJson UtxoQR where
   decodeJson j = UtxoQR <$> parseUtxoQueryResult j
+
+newtype TxQR = TxQR Unit
+
+derive newtype instance showTxQR :: Show TxQR
+
+instance decodeJsonTxQR :: DecodeJson TxQR where
+  decodeJson j = Left $ TypeMismatch $ "Not Implemented"
 
 -- the inner type for Utxo Queries
 type UtxoQueryResult = Map.Map TxOutRef OgmiosTxOut 
@@ -152,7 +169,7 @@ type UtxoQueryResult = Map.Map TxOutRef OgmiosTxOut
 -- TxOutRef
 type TxOutRef = 
   { txId :: String,
-    index :: BigInt.BigInt
+    index :: Int
   }
 
 parseUtxoQueryResult :: Json -> Either JsonDecodeError UtxoQueryResult
@@ -217,7 +234,7 @@ parseTxOut = jsonObject $
 parseValue :: Object Json -> Either JsonDecodeError Value
 parseValue outer = do
   o <- getField outer "value"
-  coins <- parseFieldToBigInt o "coins" <|> (parseFieldToInt o "coins") <|> Left (TypeMismatch "Expected 'coins' to be an Int or a BigInt")
+  coins <- parseFieldToBigInt o "coins" <|> (convertIntParsing $ parseFieldToInt o "coins") <|> Left (TypeMismatch "Expected 'coins' to be an Int or a BigInt")
   (assetsJson :: {}) <- getField o "assets"
   -- note 'coins' is being sent as a number, in some cases this may exceed the max safe 
   -- representation of a Number, we may need to parse this up from a string instead of from 
@@ -227,3 +244,10 @@ parseValue outer = do
   -- assets are currently assumed to be empty
   -- newtype Value = Value (Map CurrencySymbol (Map TokenName BigInt.BigInt))
   pure $ Value $ Map.singleton (CurrencySymbol "") (Map.singleton (TokenName "") coins)
+
+convertIntParsing 
+  :: Either JsonDecodeError Int
+  -> Either JsonDecodeError BigInt.BigInt
+convertIntParsing (Left e) = Left e
+convertIntParsing (Right i) = do
+   note (TypeMismatch "unexpected conversion failure from Int to BigInt") $ BigInt.fromString $ Int.toStringAs (Int.decimal) i

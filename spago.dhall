@@ -18,6 +18,7 @@ You can edit this file as you like.
   , "foldable-traversable"
   , "foreign-object"
   , "identity"
+  , "integers"
   , "maybe"
   , "medea"
   , "mote"
