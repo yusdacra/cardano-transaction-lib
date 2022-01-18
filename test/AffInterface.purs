@@ -4,9 +4,8 @@ import Prelude
 import Control.Monad.Reader.Trans (runReaderT)
 import TestM (TestPlanM)
 import Effect.Aff (Aff)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Mote (bracket, group, test)
+import Mote (group, test)
 import Ogmios (QueryM, mkOgmiosWebSocketAff, discardOgmiosWebSocket, utxosAt, txQuery)
 
 testnet_addr :: String

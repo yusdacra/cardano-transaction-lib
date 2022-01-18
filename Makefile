@@ -23,3 +23,9 @@ run-testnet-ogmios:
 
 query-testnet-sync:
 	cardano-cli query tip --testnet-magic 1097911063
+
+test:
+	npm test
+
+build:
+	spago build
