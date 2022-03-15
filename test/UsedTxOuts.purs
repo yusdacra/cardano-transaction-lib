@@ -63,62 +63,62 @@ suite =
       anyTxOutsLocked txos = runReaderT (any identity <$> traverse isTxOutRefUsed txos)
       allTxOutsLocked txos = runReaderT (all identity <$> traverse isTxOutRefUsed txos)
 
-    test "UsedTxOuts cache properly locks and unlocks tx txouts" $ do
+    group "UsedTxOuts cache properly locks and unlocks tx txouts" $ do
       newUsedTxOuts >>= \outs -> do
         -- starts empty
-        log "TxOuts should start unlocked"
-        anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
+        test "TxOuts should start unlocked" do
+          anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
 
-        -- lock
-        runReaderT (lockTransactionInputs tx) outs
-        log "All usedTxOuts should be now locked"
-        allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
-        log "None of the unused should be locked"
-        anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
+          -- lock
+          runReaderT (lockTransactionInputs tx) outs
+        test "All usedTxOuts should be now locked" do
+          allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
+        test "None of the unused should be locked" do
+          anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
 
-        -- unlock
-        runReaderT (unlockTransactionInputs tx) outs
-        log "All TxOuts should be now unlocked"
-        anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
+          -- unlock
+          runReaderT (unlockTransactionInputs tx) outs
+        test "All TxOuts should be now unlocked" do
+          anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
 
-    test "UsedTxOuts cache properly locks and unlock selected txouts" $ do
+    group "UsedTxOuts cache properly locks and unlock selected txouts" $ do
       newUsedTxOuts >>= \outs -> do
         -- starts empty
-        log "TxOuts should start unlocked"
-        anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
+        test "TxOuts should start unlocked" do
+          anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
 
         -- lock
-        runReaderT (lockTransactionInputs tx) outs
-        log "All usedTxOuts should be now locked"
-        allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
-        log "None of the unused should be locked"
-        anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
+          runReaderT (lockTransactionInputs tx) outs
+        test "All usedTxOuts should be now locked" do
+          allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
+        test "None of the unused should be locked" do
+          anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
 
         -- unlock unused
-        runReaderT (unlockTxOutRefs unusedTxOutRefs) outs
-        log "All usedTxOuts should be now locked"
-        allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
-        log "None of the unused should be locked"
-        anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
+          runReaderT (unlockTxOutRefs unusedTxOutRefs) outs
+        test "All usedTxOuts should be now locked" do
+          allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
+        test "None of the unused should be locked" do
+          anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
 
         -- unlock used
-        runReaderT (unlockTxOutRefs usedTxOutRefs) outs
-        log "All txouts should be now unlocked"
-        anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
+          runReaderT (unlockTxOutRefs usedTxOutRefs) outs
+        test "All txouts should be now unlocked" do
+          anyTxOutsLocked (usedTxOutRefs <> unusedTxOutRefs) outs `shouldReturn` false
 
         -- lock
-        runReaderT (lockTransactionInputs tx) outs
-        log "All usedTxOuts should be now locked"
-        allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
+          runReaderT (lockTransactionInputs tx) outs
+        test "All usedTxOuts should be now locked" do
+          allTxOutsLocked usedTxOutRefs outs `shouldReturn` true
 
         -- unlock 'head'
         let { head, tail } = unsafePartial $ fromJust (uncons usedTxOutRefs)
-        runReaderT (unlockTxOutRefs $ singleton head) outs
         -- head unlocked
-        log "Head should be unlocked"
-        runReaderT (isTxOutRefUsed head) outs `shouldReturn` false
+        test "Head should be unlocked" do
+          runReaderT (unlockTxOutRefs $ singleton head) outs
+          runReaderT (isTxOutRefUsed head) outs `shouldReturn` false
         -- tail remains locked
-        log "Trail should be locked"
-        allTxOutsLocked tail outs `shouldReturn` true
-        log "Unused should be unlocked"
-        anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
+        test "Trail should be locked" do
+          allTxOutsLocked tail outs `shouldReturn` true
+        test "Unused should be unlocked" do
+          anyTxOutsLocked unusedTxOutRefs outs `shouldReturn` false
