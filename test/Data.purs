@@ -4,6 +4,7 @@ module Test.Data (suite) where
 import Prelude
 
 import Data.BigInt as BigInt
+import Data.Either (Either(Left))
 import Data.Map as Map
 import Data.Maybe (Maybe(Just))
 import Data.Traversable (for_)
@@ -47,3 +48,9 @@ suite = do
         input = Map.fromFoldable
           [ Map.fromFoldable [ unit /\ unit ] /\ Map.fromFoldable [ unit /\ unit ] ]
       fromData (toData input) `shouldEqual` Just input
+    group "Either" do
+      let
+        inputs = [ Left (BigInt.fromInt 1) :: Either BigInt.BigInt Unit ]
+      for_ inputs \input -> do
+        test (show input) do
+          fromData (toData input) `shouldEqual` Just input
