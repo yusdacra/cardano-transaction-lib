@@ -18,6 +18,7 @@ import Cardano.Ledger.Alonzo.Tx as Tx
 import Cardano.Ledger.Alonzo.TxWitness as TxWitness
 import Cardano.Ledger.Crypto (StandardCrypto)
 import Codec.CBOR.Read (deserialiseFromBytes)
+import Codec.CBOR.Write qualified as CBORWrite
 import Control.Lens
 import Control.Monad.Catch (throwM)
 import Control.Monad.Reader (asks)
@@ -47,6 +48,9 @@ import Types (
   hashLedgerScript,
  )
 
+import Control.Monad.IO.Class
+import Data.Foldable
+
 estimateTxFees :: Cbor -> AppM Fee
 estimateTxFees cbor = do
   decoded <- either (throwM . FeeEstimate . decodeErrorToEstimateError) pure $
@@ -75,10 +79,14 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
     decodeCborRedeemers redeemers
   decodedDatums <- maybe (handleError $ InvalidHex "Failed to decode Datums") pure $
     traverse decodeCborDatum datums
+  liftIO $ print datums
+  forM_ decodedDatums $ \datum ->
+    liftIO $ print $ encodeCborDatum datum
   let
-    languages = Set.fromList [PlutusV1, PlutusV2]
+    languages = Set.fromList [PlutusV1]
     txDatums = TxWitness.TxDats . Map.fromList $
-      decodedDatums <&> \datum -> (Data.hashData datum, datum)
+      decodedDatums <&> \datum ->
+      (Data.hashData datum, datum)
     mbIntegrityHash = Tx.hashScriptIntegrity
       (C.toLedgerPParams C.ShelleyBasedEraAlonzo pparams)
       languages
@@ -93,7 +101,7 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
           \witness -> witness { txdats = txDatums, txrdmrs = decodedRedeemers } }
     finalizedTx = addIntegrityHash $ addDatumsAndRedeemers decodedTx
     response = FinalizedTransaction . encodeCborText . Cbor.serializeEncoding $
-      Tx.toCBORForMempoolSubmission finalizedTx
+      Cbor.toCBOR finalizedTx
   pure response
   where
     handleError = throwM . FinalizeTx . decodeErrorToFinalizeError
@@ -158,3 +166,10 @@ decodeCborDatum cbor = do
   bs <- preview _Right $ decodeCborTextLazyBS cbor
   fmap (flip runAnnotator (Full bs)) $ preview _Right $ fmap snd $
     deserialiseFromBytes Cbor.fromCBOR bs
+
+encodeCborDatum :: Data.Data (Alonzo.AlonzoEra StandardCrypto) -> Cbor
+encodeCborDatum =
+  Cbor .
+  Text.Encoding.decodeUtf8 .
+  Base16.encode .
+  CBORWrite.toStrictByteString . Cbor.toCBOR
