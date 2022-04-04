@@ -81,6 +81,7 @@ marketplaceBuy nftData = do
   balancedTx <- liftedE' $ balanceTx unbalancedTx
   log "marketplaceBuy: Transaction successfully balanced"
   -- Reattach datums and redeemer:
+  log $ show balancedTx
   FinalizedTransaction txCbor <-
     liftedM "marketplaceBuy: Cannot attach datums and redeemer"
       (finalizeTx balancedTx datums redeemers)
