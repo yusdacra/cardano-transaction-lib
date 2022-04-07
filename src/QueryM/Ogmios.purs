@@ -5,17 +5,20 @@ module QueryM.Ogmios where
 import Prelude
 
 import Aeson (class DecodeAeson, Aeson, caseAesonArray, caseAesonObject, decodeAeson, getField, getFieldOptional)
+import Contract.Prelude (traverse)
 import Control.Alt ((<|>))
-import Data.Argonaut (class EncodeJson, JsonDecodeError(TypeMismatch))
+import Data.Argonaut (class EncodeJson, JsonDecodeError(..))
 import Data.Array (index)
 import Data.BigInt (BigInt)
+import Data.Bitraversable (ltraverse)
 import Data.Either (Either(Left, Right), hush, note)
 import Data.Foldable (foldl)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Newtype (wrap)
-import Data.String (Pattern(Pattern), indexOf, splitAt, uncons)
+import Data.String (Pattern(Pattern), drop, indexOf, splitAt, uncons)
+import Data.String.CodeUnits (dropWhile, takeWhile)
 import Data.Traversable (sequence)
 import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\), type (/\))
@@ -27,6 +30,8 @@ import Serialization.Address (Slot)
 import Type.Proxy (Proxy(Proxy))
 import Types.ByteArray (ByteArray, byteArrayToHex, hexToByteArray)
 import Types.Natural (Natural)
+import Types.Natural as Natural
+import Types.RedeemerTag (RedeemerTag(..))
 import Types.RedeemerTag as Tag
 import Types.Value (CurrencySymbol, TokenName, Value, mkCurrencySymbol, mkTokenName, mkValue)
 import Untagged.TypeCheck (class HasRuntimeType)
@@ -90,14 +95,38 @@ mkOgmiosCallType = mkCallType
 ---------------- TX EVALUTATION QUERY RESPONSE & PARSING
 
 newtype TxEvaluationResult = TxEvaluationResult
-  { "EvaluationResult"
-    :: Map
-       {entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural}
-       {memory :: Natural, steps :: Natural }
-  }
+  (Map
+    {entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural}
+    {memory :: Natural, steps :: Natural }
+  )
 
 instance DecodeAeson TxEvaluationResult where
-  decodeAeson _ = Left (TypeMismatch "DecodeAeson TxEvaluationResult is not implemented")
+  decodeAeson j = do
+    m :: {"EvaluationResult" :: Map String { memory :: Natural, steps :: Natural }} <- decodeAeson j
+    TxEvaluationResult <<< Map.fromFoldable <$> (parseKeys <<< Map.toUnfoldable $ m."EvaluationResult")
+
+    where
+     parseKeys
+       :: forall x
+        . Array (String /\ x)
+       -> Either JsonDecodeError (Array ({entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural} /\ x))
+     parseKeys = traverse (ltraverse parseTagAndIx)
+
+     parseTagAndIx
+       :: String
+       -> Either JsonDecodeError {entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural}
+     parseTagAndIx s =
+       note (TypeMismatch $ "Expected encoded redeemertag and index, got: " <> s) do
+         entityRedeemerTag <- parseTag $ takeWhile (\x -> x /= ':') s
+         entityIndex <- Natural.fromString $ drop 1 $ dropWhile (\x -> x /= ':') s
+         pure {entityRedeemerTag, entityIndex}
+
+     parseTag = case _ of
+       "spend" -> Just Spend
+       "mint" -> Just Mint
+       "cert" -> Just Cert
+       "reward" -> Just Reward
+       _ -> Nothing
 
 ---------------- CHAIN TIP QUERY RESPONSE & PARSING
 
