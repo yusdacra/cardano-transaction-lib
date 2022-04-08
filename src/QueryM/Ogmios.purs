@@ -1,59 +1,105 @@
 -- | Provides types and instances to create Ogmios requests and decode
 -- | its responses.
-module QueryM.Ogmios where
+module QueryM.Ogmios
+  ( ChainOrigin(..)
+  , ChainPoint(..)
+  , ChainTipQR(..)
+  , OgmiosAddress
+  , OgmiosBlockHeaderHash(..)
+  , OgmiosTxOut(..)
+  , OgmiosTxOutRef(..)
+  , TxEvaluationResult(..)
+  , UtxoQueryResult(..)
+  , UtxoQR(..)
+  , queryChainTipCall
+  , queryUtxosCall
+  , queryUtxosAtCall
+  , submitTxCall
+  , evaluateTxCall
+  ) where
 
 import Prelude
 
-import Aeson (class DecodeAeson, Aeson, caseAesonArray, caseAesonObject, decodeAeson, getField, getFieldOptional)
-import Contract.Prelude (traverse)
+import Aeson
+  ( class DecodeAeson
+  , Aeson
+  , caseAesonArray
+  , caseAesonObject
+  , decodeAeson
+  , getField
+  , getFieldOptional
+  )
 import Control.Alt ((<|>))
-import Data.Argonaut (class EncodeJson, JsonDecodeError(..))
-import Data.Array (index)
+import Data.Argonaut (class EncodeJson, JsonDecodeError(TypeMismatch))
+import Data.Array (index, singleton)
 import Data.BigInt (BigInt)
-import Data.Bitraversable (ltraverse)
-import Data.Either (Either(Left, Right), hush, note)
+import Data.Either (Either(Left, Right), either, hush, note)
 import Data.Foldable (foldl)
+import Data.Generic.Rep (class Generic)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Newtype (wrap)
-import Data.String (Pattern(Pattern), drop, indexOf, splitAt, uncons)
-import Data.String.CodeUnits (dropWhile, takeWhile)
+import Data.Show.Generic (genericShow)
+import Data.String (Pattern(Pattern), indexOf, splitAt, uncons)
 import Data.Traversable (sequence)
 import Data.Tuple (uncurry)
 import Data.Tuple.Nested ((/\), type (/\))
 import Data.UInt as UInt
 import Foreign.Object (Object)
 import Foreign.Object as FO
-import QueryM.JsonWsp (JsonWspCall, JsonWspRequest, mkCallType, parseFieldToBigInt, parseFieldToString, parseFieldToUInt)
+import QueryM.JsonWsp
+  ( JsonWspCall
+  , JsonWspRequest
+  , mkCallType
+  , parseFieldToBigInt
+  , parseFieldToString
+  , parseFieldToUInt
+  )
 import Serialization.Address (Slot)
 import Type.Proxy (Proxy(Proxy))
 import Types.ByteArray (ByteArray, byteArrayToHex, hexToByteArray)
 import Types.Natural (Natural)
-import Types.Natural as Natural
-import Types.RedeemerTag (RedeemerTag(..))
 import Types.RedeemerTag as Tag
-import Types.Value (CurrencySymbol, TokenName, Value, mkCurrencySymbol, mkTokenName, mkValue)
+import Types.Value
+  ( CurrencySymbol
+  , TokenName
+  , Value
+  , mkCurrencySymbol
+  , mkTokenName
+  , mkValue
+  )
 import Untagged.TypeCheck (class HasRuntimeType)
 import Untagged.Union (type (|+|), toEither1)
-
 
 -- LOCAL STATE QUERY PROTOCOL
 -- https://ogmios.dev/mini-protocols/local-state-query/
 
 -- | Queries Ogmios for the chain’s current tip.
 queryChainTipCall :: JsonWspCall Unit ChainTipQR
-queryChainTipCall = mkOgmiosCallType {methodname: "QueryChainTip", args: identity} Proxy
+queryChainTipCall = mkOgmiosCallType
+  { methodname: "Query"
+  , args: const { query: "chainTip" }
+  }
+  Proxy
 
 -- | Queries Ogmios for utxos at given addresses.
 -- NOTE. querying for utxos by address is deprecated, should use output reference instead
 queryUtxosCall :: JsonWspCall { utxo :: Array OgmiosAddress } UtxoQR
-queryUtxosCall = mkOgmiosCallType {methodname: "QueryUtxos", args: identity} Proxy
+queryUtxosCall = mkOgmiosCallType
+  { methodname: "Query"
+  , args: { query: _ }
+  }
+  Proxy
 
 -- | Queries Ogmios for utxos at given address.
 -- NOTE. querying for utxos by address is deprecated, should use output reference instead
 queryUtxosAtCall :: JsonWspCall OgmiosAddress UtxoQR
-queryUtxosAtCall = mkOgmiosCallType {methodname: "QueryUtxos", args: \addr -> {utxo: [ addr]} } Proxy
+queryUtxosAtCall = mkOgmiosCallType
+  { methodname: "Query"
+  , args: { query: _ } <<< { utxo: _ } <<< singleton
+  }
+  Proxy
 
 type OgmiosAddress = String
 
@@ -62,11 +108,15 @@ type OgmiosAddress = String
 
 -- | Sends a serialized signed transaction with its full witness through the
 -- | Cardano network via Ogmios.
--- NOTE JSON doesn't support embedding raw bytes in objects. Bytes needs to be encoded in either Base16 or Base64.
+-- NOTE JSON doesn't support embedding raw bytes in objects. Bytes needs to be
+-- encoded in either Base16 or Base64.
+-- TODO Change return type to `TransactionHash`
+-- see https://github.com/Plutonomicon/cardano-transaction-lib/issues/290
 submitTxCall :: JsonWspCall { txCbor :: ByteArray } TxHash
 submitTxCall = mkOgmiosCallType
   { methodname: "SubmitTx"
-  , args: \ {txCbor} -> {submit: byteArrayToHex txCbor} }
+  , args: { submit: _ } <<< byteArrayToHex <<< _.txCbor
+  }
   Proxy
 
 type TxHash = String
@@ -76,12 +126,13 @@ type TxHash = String
 evaluateTxCall :: JsonWspCall { txCbor :: ByteArray } TxEvaluationResult
 evaluateTxCall = mkOgmiosCallType
   { methodname: "EvaluateTx"
-  , args: \ {txCbor} -> {evaluate: byteArrayToHex txCbor} }
+  , args: { evaluate: _ } <<< byteArrayToHex <<< _.txCbor
+  }
   Proxy
 
 -- convenience helper
 mkOgmiosCallType
-  :: forall a i o
+  :: forall (a :: Type) (i :: Type) (o :: Type)
    . EncodeJson (JsonWspRequest a)
   => { methodname :: String, args :: i -> a }
   -> Proxy o
@@ -95,38 +146,15 @@ mkOgmiosCallType = mkCallType
 ---------------- TX EVALUTATION QUERY RESPONSE & PARSING
 
 newtype TxEvaluationResult = TxEvaluationResult
-  (Map
-    {entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural}
-    {memory :: Natural, steps :: Natural }
-  )
+  { "EvaluationResult" ::
+      Map
+        { entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural }
+        { memory :: Natural, steps :: Natural }
+  }
 
 instance DecodeAeson TxEvaluationResult where
-  decodeAeson j = do
-    m :: {"EvaluationResult" :: Map String { memory :: Natural, steps :: Natural }} <- decodeAeson j
-    TxEvaluationResult <<< Map.fromFoldable <$> (parseKeys <<< Map.toUnfoldable $ m."EvaluationResult")
-
-    where
-     parseKeys
-       :: forall x
-        . Array (String /\ x)
-       -> Either JsonDecodeError (Array ({entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural} /\ x))
-     parseKeys = traverse (ltraverse parseTagAndIx)
-
-     parseTagAndIx
-       :: String
-       -> Either JsonDecodeError {entityRedeemerTag :: Tag.RedeemerTag, entityIndex :: Natural}
-     parseTagAndIx s =
-       note (TypeMismatch $ "Expected encoded redeemertag and index, got: " <> s) do
-         entityRedeemerTag <- parseTag $ takeWhile (\x -> x /= ':') s
-         entityIndex <- Natural.fromString $ drop 1 $ dropWhile (\x -> x /= ':') s
-         pure {entityRedeemerTag, entityIndex}
-
-     parseTag = case _ of
-       "spend" -> Just Spend
-       "mint" -> Just Mint
-       "cert" -> Just Cert
-       "reward" -> Just Reward
-       _ -> Nothing
+  decodeAeson _ = Left
+    (TypeMismatch "DecodeAeson TxEvaluationResult is not implemented")
 
 ---------------- CHAIN TIP QUERY RESPONSE & PARSING
 
@@ -134,32 +162,44 @@ data ChainTipQR
   = CtChainOrigin ChainOrigin
   | CtChainPoint ChainPoint
 
+derive instance Generic ChainTipQR _
+
+instance Show ChainTipQR where
+  show = genericShow
+
 instance DecodeAeson ChainTipQR where
   decodeAeson j = do
     r :: (ChainOrigin |+| ChainPoint) <- decodeAeson j
-    pure $ case toEither1 r of
-      Left co -> CtChainOrigin co
-      Right cp -> CtChainPoint cp
+    pure $ either CtChainOrigin CtChainPoint $ toEither1 r
 
--- | A Blake2b 32-byte digest of an era-independent block header, serialised as CBOR in base16
+-- | A Blake2b 32-byte digest of an era-independent block header, serialised as
+-- CBOR in base16
 newtype OgmiosBlockHeaderHash = OgmiosBlockHeaderHash String
 
 derive instance Eq OgmiosBlockHeaderHash
 derive newtype instance DecodeAeson OgmiosBlockHeaderHash
+derive instance Generic OgmiosBlockHeaderHash _
 
--- | The origin of the blockchain. It doesn't point to any existing slots, but is preceding any existing other point.
+instance Show OgmiosBlockHeaderHash where
+  show = genericShow
+
+-- | The origin of the blockchain. It doesn't point to any existing slots, but
+-- is preceding any existing other point.
 newtype ChainOrigin = ChainOrigin String
 
 derive instance Eq ChainOrigin
 derive newtype instance DecodeAeson ChainOrigin
 derive newtype instance HasRuntimeType ChainOrigin
+derive instance Generic ChainOrigin _
+
+instance Show ChainOrigin where
+  show = genericShow
 
 -- | A point on the chain, identified by a slot and a block header hash
 type ChainPoint =
   { slot :: Slot
   , hash :: OgmiosBlockHeaderHash
   }
-
 
 ---------------- UTXO QUERY RESPONSE & PARSING
 
@@ -168,9 +208,9 @@ type ChainPoint =
 -- | Ogmios response for Utxo Query
 newtype UtxoQR = UtxoQR UtxoQueryResult
 
-derive newtype instance showUtxoQR :: Show UtxoQR
+derive newtype instance Show UtxoQR
 
-instance decodeAesonUtxoQR :: DecodeAeson UtxoQR where
+instance DecodeAeson UtxoQR where
   decodeAeson j = UtxoQR <$> parseUtxoQueryResult j
 
 -- the inner type for Utxo Queries
@@ -184,7 +224,7 @@ type OgmiosTxOutRef =
 
 parseUtxoQueryResult :: Aeson -> Either JsonDecodeError UtxoQueryResult
 parseUtxoQueryResult = caseAesonArray (Left (TypeMismatch "Expected Array")) $
-  (\array -> foldl insertFunc (Right Map.empty) array)
+  foldl insertFunc (Right Map.empty)
   where
   insertFunc
     :: Either JsonDecodeError UtxoQueryResult
@@ -194,8 +234,9 @@ parseUtxoQueryResult = caseAesonArray (Left (TypeMismatch "Expected Array")) $
     where
     inner :: Array Aeson -> Either JsonDecodeError UtxoQueryResult
     inner innerArray = do
-      txOutRefJson <- note (TypeMismatch "missing 0th element, expected an OgmiosTxOutRef") $
-        index innerArray 0
+      txOutRefJson <-
+        note (TypeMismatch "missing 0th element, expected an OgmiosTxOutRef") $
+          index innerArray 0
       txOutJson <- note (TypeMismatch "missing 1st element, expected a TxOut") $
         index innerArray 1
       txOutRef <- parseTxOutRef txOutRefJson
@@ -212,12 +253,10 @@ aesonObject = caseAesonObject (Left (TypeMismatch "expected object"))
 
 -- parser for txOutRef
 parseTxOutRef :: Aeson -> Either JsonDecodeError OgmiosTxOutRef
-parseTxOutRef = aesonObject $
-  ( \o -> do
-      txId <- parseFieldToString o "txId"
-      index <- parseFieldToUInt o "index"
-      pure { txId, index }
-  )
+parseTxOutRef = aesonObject $ \o -> do
+  txId <- parseFieldToString o "txId"
+  index <- parseFieldToUInt o "index"
+  pure { txId, index }
 
 type OgmiosTxOut =
   { address :: OgmiosAddress
@@ -229,35 +268,38 @@ type OgmiosTxOut =
 -- cardano-serialization-lib 'OgmiosAddress' type,  perhaps this information can be
 -- extracted.
 parseTxOut :: Aeson -> Either JsonDecodeError OgmiosTxOut
-parseTxOut = aesonObject $
-  ( \o -> do
-      address <- parseFieldToString o "address"
-      value <- parseValue o
-      let datum = hush $ parseFieldToString o "datum"
-      pure $ { address, value, datum }
-  )
+parseTxOut = aesonObject $ \o -> do
+  address <- parseFieldToString o "address"
+  value <- parseValue o
+  let datum = hush $ parseFieldToString o "datum"
+  pure $ { address, value, datum }
 
 -- parses the `Value` type
 parseValue :: Object Aeson -> Either JsonDecodeError Value
 parseValue outer = do
   o <- getField outer "value"
-  coins <- parseFieldToBigInt o "coins" <|> Left (TypeMismatch "Expected 'coins' to be an Int or a BigInt")
-  Assets assetsMap <- fromMaybe (Assets Map.empty) <$> getFieldOptional o "assets"
+  coins <- parseFieldToBigInt o "coins"
+    <|> Left (TypeMismatch "Expected 'coins' to be an Int or a BigInt")
+  Assets assetsMap <- fromMaybe (Assets Map.empty)
+    <$> getFieldOptional o "assets"
   pure $ mkValue (wrap coins) (wrap assetsMap)
-
 
 newtype Assets = Assets (Map CurrencySymbol (Map TokenName BigInt))
 
 instance DecodeAeson Assets where
   decodeAeson j = do
     wspAssets :: Array (String /\ BigInt) <- FO.toUnfoldable <$> decodeAeson j
-    Assets <<< Map.fromFoldableWith (Map.unionWith (+)) <$> sequence (uncurry decodeAsset <$> wspAssets)
+    Assets <<< Map.fromFoldableWith (Map.unionWith (+)) <$> sequence
+      (uncurry decodeAsset <$> wspAssets)
     where
-    decodeAsset :: String -> BigInt -> Either JsonDecodeError (CurrencySymbol /\ Map TokenName BigInt)
+    decodeAsset
+      :: String
+      -> BigInt
+      -> Either JsonDecodeError (CurrencySymbol /\ Map TokenName BigInt)
     decodeAsset assetStr quantity = do
       let
-        -- Ogmios encodes CurrencySymbol and TokenName to hex strings separated with '.'
-        -- TokenName part is optional
+        -- Ogmios encodes CurrencySymbol and TokenName to hex strings separated
+        -- with '.' TokenName part is optional
         currSymStr /\ tnStr = case indexOf (Pattern ".") assetStr of
           Nothing -> assetStr /\ ""
           Just ix ->
@@ -273,4 +315,10 @@ instance DecodeAeson Assets where
         $ mkTokenName =<< hexToByteArray tnStr
       pure $ currSymb /\ Map.singleton tokenName quantity
 
-    assetStrError str t v = (TypeMismatch ("In " <> str <> ": Expected hex-encoded " <> t <> ", got: " <> v))
+    assetStrError str t v = TypeMismatch $
+      "In "
+        <> str
+        <> ": Expected hex-encoded "
+        <> t
+        <> ", got: "
+        <> v
