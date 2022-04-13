@@ -264,7 +264,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
       }
   mkCollection r = do
     collectionNftCs <- note (error $ "Invalid collection currency symbol: " <> r.collectionNftCs)
-      $ mkCurrencySymbol =<< byteArrayFromString r.collectionNftCs
+      $ mkCurrencySymbol =<< hexToByteArray r.collectionNftCs
     lockLockupEnd <- note (error $ "Invalid nft lockLockupEnd: " <> show r.lockLockupEnd)
       $ Slot <$> (UInt.fromString $ BigInt.toString r.lockLockupEnd)
     lockingScript <- note (error $ "Invalid nft lockingScript: " <> r.lockingScript)
