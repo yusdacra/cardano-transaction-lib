@@ -6,6 +6,7 @@ module QueryM
   , DispatchIdMap
   , FeeEstimate(..)
   , FinalizedTransaction(..)
+  , EvaluatedTransaction(..)
   , HashedData(..)
   , Host
   , JsWebSocket
@@ -33,6 +34,7 @@ module QueryM
   , defaultDatumCacheWsConfig
   , defaultOgmiosWsConfig
   , defaultServerConfig
+  , evaluateTx
   , finalizeTx
   , getDatumByHash
   , getDatumsByHashes
@@ -123,13 +125,21 @@ import Types.MultiMap as MultiMap
 import QueryM.JsonWsp as JsonWsp
 import QueryM.Ogmios as Ogmios
 import Serialization (convertTransaction, toBytes) as Serialization
-import Serialization.Address (Address, BlockId, NetworkId, Slot, addressPaymentCred, stakeCredentialToKeyHash)
+import Serialization.Address
+  ( Address
+  , BlockId
+  , NetworkId
+  , Slot
+  , addressPaymentCred
+  , stakeCredentialToKeyHash
+  )
 import Serialization.Hash (ScriptHash)
 import Serialization.PlutusData (convertPlutusData) as Serialization
 import Serialization.WitnessSet (convertRedeemers) as Serialization
 import Types.ByteArray (ByteArray, byteArrayToHex, hexToByteArray)
 import Types.Datum (Datum, DatumHash)
 import Types.Interval (SlotConfig)
+import Types.Natural (Natural)
 import Types.PlutusData (PlutusData)
 import Types.Scripts (PlutusScript)
 import Types.Transaction (Transaction(Transaction))
@@ -220,8 +230,24 @@ getChainTip = mkOgmiosRequest Ogmios.queryChainTipCall _.chainTip unit
 -- OGMIOS LOCAL TX SUBMISSION PROTOCOL
 --------------------------------------------------------------------------------
 
-submitTxOgmios :: ByteArray -> QueryM String
-submitTxOgmios txCbor = mkOgmiosRequest Ogmios.submitTxCall _.submit { txCbor }
+submitTxOgmios :: EvaluatedTransaction -> QueryM String
+submitTxOgmios (EvaluatedTransaction txCbor) = mkOgmiosRequest
+  Ogmios.submitTxCall
+  _.submit
+  { txCbor }
+
+evaluateTx :: FinalizedTransaction -> QueryM TxEvaluationResult
+evaluateTx (FinalizedTransaction txCbor) = mkOgmiosRequest Ogmios.evaluateTxCall
+  _.evaluate
+  { txCbor }
+
+evaluateTxAndSetExunits
+  :: FinalizedTransaction
+  -> { memoryExtraMarginPercent :: Natural, stepsExtraMarginPercent :: Natural }
+  -> QueryM EvaluatedTransaction
+evaluateTxAndSetExunits finTx@(FinalizedTransaction txCbor) margins = do
+  exunits <- evaluateTx finTx
+  pure (EvaluatedTransaction txCbor)
 
 --------------------------------------------------------------------------------
 -- DATUM CACHE QUERIES
@@ -500,6 +526,9 @@ calculateMinFee tx@(Transaction { body: Transaction.TxBody body }) = do
 
 -- | CborHex-encoded tx
 newtype FinalizedTransaction = FinalizedTransaction ByteArray
+
+-- | CborHex-encoded tx after finalization and evaluation (exunits set)
+newtype EvaluatedTransaction = EvaluatedTransaction ByteArray
 
 derive instance Generic FinalizedTransaction _
 

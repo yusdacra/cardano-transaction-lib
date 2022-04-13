@@ -24,8 +24,8 @@ module Contract.Transaction
 
 import Prelude
 
-import BalanceTx (balanceTx) as BalanceTx
 import BalanceTx (BalanceTxError) as BalanceTxError
+import BalanceTx (balanceTx) as BalanceTx
 import Contract.Monad (Contract, liftedE', liftedM, wrapContract)
 import Data.Either (Either, hush)
 import Data.Generic.Rep (class Generic)
@@ -34,9 +34,10 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\))
+import QueryM (EvaluatedTransaction)
 import QueryM
   ( FeeEstimate(FeeEstimate)
-  , ClientError(..) -- implicit as this error list will likely increase.
+  , ClientError(..)
   , FinalizedTransaction(FinalizedTransaction)
   ) as ExportQueryM
 import QueryM
@@ -47,11 +48,10 @@ import QueryM
   , finalizeTx
   , submitTxOgmios
   ) as QueryM
+import QueryM.Ogmios (OgmiosTxOut, OgmiosTxOutRef) as Ogmios
+import ReindexRedeemers (ReindexErrors(CannotGetTxOutRefIndexForRedeemer)) as ReindexRedeemersExport
 import ReindexRedeemers (reindexSpentScriptRedeemers) as ReindexRedeemers
-import ReindexRedeemers
-  ( ReindexErrors(CannotGetTxOutRefIndexForRedeemer)
-  ) as ReindexRedeemersExport
-import TxOutput -- Could potentially trim this down, -- FIX ME: https://github.com/Plutonomicon/cardano-transaction-lib/issues/200
+import TxOutput
   ( ogmiosTxOutToScriptOutput
   , ogmiosTxOutToTransactionOutput
   , scriptOutputToOgmiosTxOut
@@ -63,14 +63,9 @@ import TxOutput -- Could potentially trim this down, -- FIX ME: https://github.c
   ) as TxOutput
 import Types.ByteArray (ByteArray)
 import Types.Datum (Datum)
-import QueryM.Ogmios (OgmiosTxOut, OgmiosTxOutRef) as Ogmios -- FIX ME: https://github.com/Plutonomicon/cardano-transaction-lib/issues/200
+import Types.ScriptLookups (MkUnbalancedTxError(..), mkUnbalancedTx) as ScriptLookups
 import Types.ScriptLookups (UnattachedUnbalancedTx(UnattachedUnbalancedTx))
-import Types.ScriptLookups
-  ( MkUnbalancedTxError(..) -- A lot errors so will refrain from explicit names.
-  , mkUnbalancedTx
-  ) as ScriptLookups
-import Types.Transaction (Transaction, _body, _inputs)
-import Types.Transaction -- Most re-exported, don't re-export `Redeemer` and associated lens.
+import Types.Transaction
   ( AuxiliaryData(AuxiliaryData)
   , AuxiliaryDataHash(AuxiliaryDataHash)
   , BootstrapWitness
@@ -115,13 +110,7 @@ import Types.Transaction -- Most re-exported, don't re-export `Redeemer` and ass
   , Transaction(Transaction)
   , TransactionHash(TransactionHash)
   , TransactionInput(TransactionInput)
-  , TransactionMetadatum
-      ( MetadataMap
-      , MetadataList
-      , Int
-      , Bytes
-      , Text
-      )
+  , TransactionMetadatum(MetadataMap, MetadataList, Int, Bytes, Text)
   , TransactionMetadatumLabel(TransactionMetadatumLabel)
   , TransactionOutput(TransactionOutput)
   , TransactionWitnessSet(TransactionWitnessSet)
@@ -157,15 +146,16 @@ import Types.Transaction -- Most re-exported, don't re-export `Redeemer` and ass
   , _withdrawals
   , _witnessSet
   ) as Transaction
-import Types.UnbalancedTransaction (UnbalancedTx)
+import Types.Transaction (Transaction, _body, _inputs)
 import Types.UnbalancedTransaction
-  ( ScriptOutput(ScriptOutput) -- More up-to-date Plutus uses this, wonder if we can just use `TransactionOutput`
+  ( ScriptOutput(ScriptOutput)
   , TxOutRef
   , UnbalancedTx(UnbalancedTx)
   , _transaction
   , _utxoIndex
   , emptyUnbalancedTx
   ) as UnbalancedTx
+import Types.UnbalancedTransaction (UnbalancedTx)
 import Types.Value (Coin)
 
 -- | This module defines transaction-related requests. Currently signing and
@@ -185,7 +175,7 @@ signTransactionBytes = wrapContract <<< QueryM.signTransactionBytes
 
 -- | Submits a Cbor-hex encoded transaction, which is the output of
 -- | `signTransactionBytes` or `balanceAndSignTx`
-submit :: forall (r :: Row Type). ByteArray -> Contract r String
+submit :: forall (r :: Row Type). EvaluatedTransaction -> Contract r String
 submit = wrapContract <<< QueryM.submitTxOgmios
 
 -- | Query the Haskell server for the minimum transaction fee
