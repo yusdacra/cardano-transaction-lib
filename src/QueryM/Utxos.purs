@@ -5,6 +5,9 @@ module QueryM.Utxos
   ) where
 
 import Prelude
+
+import Debug (spy)
+
 import Address (addressToOgmiosAddress)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (withReaderT)
@@ -88,7 +91,10 @@ utxosAt addr = asks _.wallet >>= maybe (pure Nothing) (utxosAtByWallet addr)
   allUtxosAt = addressToOgmiosAddress >>> getUtxos
     where
     getUtxos :: JsonWsp.OgmiosAddress -> QueryM (Maybe Transaction.UtxoM)
-    getUtxos address = convertUtxos <$> utxosAt' address
+    getUtxos address = do
+     utxos <- utxosAt' address
+     _ <- pure $ spy ("Debug log of results utxosAt' " <> address <> ": ") utxos
+     pure $ convertUtxos utxos
 
     convertUtxos :: JsonWsp.UtxoQR -> Maybe Transaction.UtxoM
     convertUtxos (JsonWsp.UtxoQR utxoQueryResult) =

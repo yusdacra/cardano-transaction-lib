@@ -39,7 +39,7 @@ marketPlaceListNft = do
     scriptAddr =
       typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
   scriptUtxos <- Map.toUnfoldable <<< unwrap <$>
-    liftedM "marketPlaceListNft: Cannot get script Utxos" (utxosAt scriptAddr)
+    liftedM ("marketPlaceListNft: Cannot get script Utxos at " <> show scriptAddr) (utxosAt scriptAddr)
   withMetadata <- for scriptUtxos $ \(input /\ output@(TransactionOutput out)) ->
     runMaybeT $ do
       datumHash <- MaybeT $ pure $ out.data_hash

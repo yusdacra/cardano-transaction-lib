@@ -155,9 +155,9 @@ mkMarketplaceTx (NftData nftData) = do
     datum = Datum $ toData $ curr /\ oldName
     userAddr = payPubKeyHashBaseAddress networkId pkh
   userUtxos <-
-    liftedM "marketplaceBuy: Cannot get user Utxos" (utxosAt userAddr)
+    liftedM ("marketplaceBuy: Cannot get user Utxos" <> show userAddr) (utxosAt userAddr)
   scriptUtxos <-
-    liftedM "marketplaceBuy: Cannot get script Utxos" (utxosAt scriptAddr)
+    liftedM ("marketplaceBuy: Cannot get script Utxos at " <> show scriptAddr) (utxosAt scriptAddr)
   let utxo' = Array.find containsNft $ toUnfoldable (unwrap scriptUtxos)
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace" utxo'
