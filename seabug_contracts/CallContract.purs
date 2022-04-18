@@ -34,8 +34,8 @@ import Contract.Prim.ByteArray
   , hexToByteArray
   )
 import Contract.Scripts
-  ( ed25519KeyHashFromBech32
-  , ed25519KeyHashToBech32Unsafe
+  ( ed25519KeyHashToBytes
+  , ed25519KeyHashFromBech32
   , scriptHashFromBech32
   , scriptHashToBech32Unsafe
   )
@@ -236,11 +236,11 @@ buildNftList { input: TransactionInput input, output: TransactionOutput output, 
     , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
-    , authorPkh: ed25519KeyHashToBech32Unsafe "addr_vkh" $ unwrap m.authorPkh
+    , authorPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.authorPkh
     , authorShare: unShare m.authorShare
     , marketplaceScript: scriptHashToBech32Unsafe "script" $ unwrap m.marketplaceScript
     , marketplaceShare: unShare m.marketplaceShare
-    , ownerPkh: ed25519KeyHashToBech32Unsafe "addr_vkh" $ unwrap m.ownerPkh
+    , ownerPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.ownerPkh
     , ownerPrice: toBigInt m.ownerPrice
     }
 

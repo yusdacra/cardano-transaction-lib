@@ -9,7 +9,7 @@ export type NetworkId
     | 1 // Mainnet
 
 export type Config = {
-    serverHost: number,
+    serverHost: string,
     serverPort: number,
     // If CTL Haskell server uses SSL
     serverSecureConn: boolean,
