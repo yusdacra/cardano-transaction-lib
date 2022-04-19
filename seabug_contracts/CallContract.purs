@@ -35,7 +35,7 @@ import Contract.Prim.ByteArray
   )
 import Contract.Scripts
   ( ed25519KeyHashToBytes
-  , ed25519KeyHashFromBech32
+  , ed25519KeyHashFromBytes
   , scriptHashFromBech32
   , scriptHashToBech32Unsafe
   )
@@ -256,7 +256,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     price <- note (error $ "Invalid price: " <> show r.price)
       $ Nat.fromBigInt r.price
     owner <- note (error $ "Invalid owner: " <> r.owner)
-      $ wrap <<< wrap <$> ed25519KeyHashFromBech32 r.owner
+      $ wrap <<< wrap <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.owner)
     pure $ NftId
       { collectionNftTn: tn
       , price
@@ -270,7 +270,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     lockingScript <- note (error $ "Invalid nft lockingScript: " <> r.lockingScript)
       $ wrap <$> scriptHashFromBech32 r.lockingScript
     author <- note (error $ "Invalid author: " <> r.author)
-      $ wrap <<< wrap <$> ed25519KeyHashFromBech32 r.author
+      $ wrap <<< wrap <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.author)
     authorShare <- note (error $ "Invalid authorShare: " <> show r.authorShare)
       $ Nat.fromBigInt r.authorShare
     daoScript <- note (error $ "Invalid nft daoScript: " <> r.daoScript)
