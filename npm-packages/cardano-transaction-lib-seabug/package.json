@@ -1,14 +1,14 @@
 {
   "name": "cardano-transaction-lib-seabug",
   "version": "1.0.0",
-  "description": "",
+  "description": "Cardano transaction library for the Seabug NFT marketplace.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Plutonomicon/cardano-browser-tx.git"
+    "url": "git+https://github.com/Plutonomicon/cardano-transaction-lib.git"
   },
   "keywords": [
     "cardano"
@@ -16,7 +16,7 @@
   "author": "klntsky",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Plutonomicon/cardano-browser-tx/issues"
+    "url": "https://github.com/Plutonomicon/cardano-transaction-lib/issues"
   },
   "dependencies": {
     "@ngua/cardano-serialization-lib-browser": "^9.1.2",
@@ -27,5 +27,5 @@
     "dist/*",
     ".gitignore"
   ],
-  "homepage": "https://github.com/Plutonomicon/cardano-browser-tx#readme"
+  "homepage": "https://github.com/Plutonomicon/cardano-transaction-lib#readme"
 }
