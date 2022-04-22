@@ -23,6 +23,7 @@ module QueryM
   , applyArgs
   , blake2bHash
   , calculateMinFee
+  , callNami
   , cancelFetchBlocksRequest
   , datumFilterAddHashesRequest
   , datumFilterGetHashesRequest

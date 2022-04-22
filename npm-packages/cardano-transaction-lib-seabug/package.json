@@ -24,7 +24,8 @@
     "ws": "^8.5.0"
   },
   "files": [
-      "dist/*", ".gitignore"
+    "dist/*",
+    ".gitignore"
   ],
   "homepage": "https://github.com/Plutonomicon/cardano-browser-tx#readme"
 }

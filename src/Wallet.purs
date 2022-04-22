@@ -13,7 +13,7 @@ import Control.Promise as Promise
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Newtype (over)
 import Data.Tuple.Nested ((/\))
-import Deserialization.FromBytes (fromBytesEffect)
+import Deserialization.FromBytes (fromBytes, fromBytesEffect)
 import Deserialization.UnspentOutput as Deserialization.UnspentOuput
 import Deserialization.WitnessSet as Deserialization.WitnessSet
 import Effect (Effect)
@@ -24,6 +24,7 @@ import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
 import Helpers ((<<>>))
 import Serialization as Serialization
 import Serialization.Address (Address, addressFromBytes)
+import Serialization.Types (Value)
 import Types.ByteArray (ByteArray, hexToByteArray, byteArrayToHex)
 import Types.Transaction
   ( Ed25519Signature(Ed25519Signature)
@@ -52,6 +53,8 @@ type NamiWallet =
   -- Get the address associated with the wallet (Nami does not support
   -- multiple addresses)
   , getWalletAddress :: NamiConnection -> Aff (Maybe Address)
+  -- Get the wallet's balance
+  , getBalance :: NamiConnection -> Aff (Maybe Value)
   -- Get the collateral UTxO associated with the Nami wallet
   , getCollateral :: NamiConnection -> Aff (Maybe TransactionUnspentOutput)
   -- Sign a transaction with the current wallet
@@ -69,6 +72,7 @@ mkNamiWalletAff = do
   pure $ Nami
     { connection
     , getWalletAddress
+    , getBalance
     , getCollateral
     , signTx
     , signTxBytes
@@ -82,6 +86,10 @@ mkNamiWalletAff = do
   getWalletAddress :: NamiConnection -> Aff (Maybe Address)
   getWalletAddress nami = fromNamiHexString _getNamiAddress nami >>=
     (_ >>= addressFromBytes) >>> pure
+
+  getBalance :: NamiConnection -> Aff (Maybe Value)
+  getBalance nami = fromNamiHexString _getNamiBalance nami >>= 
+    (_ >>= fromBytes) >>> pure
 
   getCollateral :: NamiConnection -> Aff (Maybe TransactionUnspentOutput)
   getCollateral nami = fromNamiMaybeHexString getNamiCollateral nami >>= case _ of
@@ -166,6 +174,8 @@ foreign import data NamiConnection :: Type
 foreign import _enableNami :: Effect (Promise NamiConnection)
 
 foreign import _getNamiAddress :: NamiConnection -> Effect (Promise String)
+
+foreign import _getNamiBalance :: NamiConnection -> Effect (Promise String)
 
 foreign import _getNamiCollateral
   :: MaybeFfiHelper -> NamiConnection -> Effect (Promise (Maybe String))

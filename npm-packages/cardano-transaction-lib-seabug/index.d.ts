@@ -3,6 +3,8 @@ export function callMarketPlaceBuy(config: Config, args: ContractArgs):
     Promise<void>
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
+export function connectWallet(): Promise<any>
+export function getWalletBalance(): Promise<any>
 
 export type NetworkId
     = 0 // Testnet

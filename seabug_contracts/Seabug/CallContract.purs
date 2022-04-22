@@ -29,8 +29,7 @@ import Contract.Prelude
   , show
   )
 import Contract.Prim.ByteArray
-  ( byteArrayFromString
-  , byteArrayToHex
+  ( byteArrayToHex
   , hexToByteArray
   )
 import Contract.Scripts

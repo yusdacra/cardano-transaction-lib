@@ -1,11 +1,11 @@
-const CallContract = import("./dist/bundle.js");
+const seabug = import("./dist/bundle.js");
 
 /**
  * Exists temporarily for testing purposes. Returns given argument.
  */
 exports.callMarketPlaceBuyTest = async (str) => {
-    const CC = await CallContract;
-    return CC.callMarketPlaceBuyTest(str)();
+    const sb = await seabug;
+    return sb.callMarketPlaceBuyTest(str)();
 };
 
 /**
@@ -14,8 +14,8 @@ exports.callMarketPlaceBuyTest = async (str) => {
  *
  */
 exports.callMarketPlaceBuy = async (config, args) => {
-    const CC = await CallContract;
-    return CC.callMarketPlaceBuy(config)(args)();
+    const sb = await seabug;
+    return sb.callMarketPlaceBuy(config)(args)();
 };
 
 /**
@@ -24,6 +24,23 @@ exports.callMarketPlaceBuy = async (config, args) => {
  *
  */
 exports.callMarketPlaceListNft = async (config) => {
-    const CC = await CallContract;
-    return CC.callMarketPlaceListNft(config)();
+    const sb = await seabug;
+    return sb.callMarketPlaceListNft(config)();
 };
+
+/**
+ * Connects to Nami wallet.
+ * Returns a promise holding the Nami wallet object.
+ */
+ exports.connectWallet = async () => {
+    const sb = await seabug;
+    return sb.connectWallet();
+};
+
+/**
+ * Returns a promise holding the wallet balance.
+ */
+exports.getWalletBalance = async () => {
+    const sb = await seabug;
+    return sb.getWalletBalance();
+}
