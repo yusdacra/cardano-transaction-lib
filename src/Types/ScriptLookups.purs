@@ -26,6 +26,7 @@ import Address (enterpriseAddressValidatorHash)
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), runExceptT)
+import Control.Monad.Logger.Trans (LoggerT)
 import Control.Monad.Reader.Class (asks)
 import Control.Monad.Reader.Trans (ReaderT)
 import Control.Monad.State.Trans (StateT, get, gets, put, runStateT)
@@ -457,7 +458,9 @@ require required = ValueSpentBalances { required, provided: mempty }
 -- We write `ReaderT QueryConfig Aff` below since type synonyms need to be fully
 -- applied.
 type ConstraintsM (a :: Type) (b :: Type) =
-  StateT (ConstraintProcessingState a) (ReaderT DefaultQueryConfig Aff) b
+  StateT (ConstraintProcessingState a)
+    (ReaderT DefaultQueryConfig (LoggerT Aff))
+    b
 
 -- The constraints don't precisely match those of Plutus:
 -- `forall a. (FromData (DatumType a), ToData (DatumType a), ToData (RedeemerType a))`
@@ -661,8 +664,8 @@ addMissingValueSpent = do
     -- Potential fix me: This logic may be suspect:
     txOut <- case pkh', skh' of
       Nothing, Nothing -> throwError OwnPubKeyAndStakeKeyMissing
-      Just pkh, Just _ -> liftEither $ Right $ TransactionOutput
-        { address: payPubKeyHashBaseAddress networkId pkh
+      Just pkh, Just skh -> liftEither $ Right $ TransactionOutput
+        { address: payPubKeyHashBaseAddress networkId pkh skh
         , amount: missing
         , dataHash: Nothing
         }
@@ -762,6 +765,7 @@ data MkUnbalancedTxError
   | TypedTxOutHasNoDatumHash
   | CannotHashMintingPolicy MintingPolicy
   | CannotHashValidator Validator
+  | CannotConvertPaymentPubKeyHash PaymentPubKeyHash
   | CannotSatisfyAny
 
 derive instance Generic MkUnbalancedTxError _
@@ -831,7 +835,10 @@ processConstraint mpsMap osMap = do
               }
     MustBeSignedBy pkh -> runExceptT do
       ppkh <- use _lookups <#> unwrap >>> _.paymentPubKeyHashes
-      let sigs = lookup pkh ppkh <#> payPubKeyRequiredSigner >>> Array.singleton
+      sigs <- for (lookup pkh ppkh) $
+        payPubKeyRequiredSigner >>>
+          maybe (throwError (CannotConvertPaymentPubKeyHash pkh))
+            (pure <<< Array.singleton)
       _cpsToTxBody <<< _requiredSigners <>= sigs
     MustSpendAtLeast vl ->
       runExceptT $ _valueSpentBalancesInputs <>= require vl
@@ -864,11 +871,12 @@ processConstraint mpsMap osMap = do
           -- Note: if we get `Nothing`, we have to throw eventhough that's a
           -- valid input, because our `txOut` above is a Script address via
           -- `Just`.
-          dataValue <- ExceptT $
-            ( lift $ getDatumByHash dHash
-                <#> note (CannotQueryDatum dHash) >>> map Datum
-            ) <|>
-              lookupDatum dHash
+          dataValue <- ExceptT $ do
+            queryD <- lift $
+              getDatumByHash dHash <#> note (CannotQueryDatum dHash) >>> map
+                Datum
+            lookupD <- lookupDatum dHash
+            pure $ queryD <|> lookupD
           ExceptT $ attachToCps attachPlutusScript plutusScript
           _cpsToTxBody <<< _inputs %= insert txo
           ExceptT $ addDatum dataValue
@@ -931,7 +939,7 @@ processConstraint mpsMap osMap = do
       _redeemers <>= Array.singleton (redeemer /\ Nothing)
       -- Attach redeemer to witness set.
       ExceptT $ attachToCps attachRedeemer redeemer
-    MustPayToPubKeyAddress pkh _ mDatum amount -> do
+    MustPayToPubKeyAddress pkh skh mDatum amount -> do
       networkId <- getNetworkId
       runExceptT do
         -- If datum is presented, add it to 'datumWitnesses' and Array of datums.
@@ -969,11 +977,12 @@ processConstraint mpsMap osMap = do
               liftDatumHash (CannotHashDatum datum) <$> datumHash datum
           )
           mDatum
-        -- Changed this to enterprise address for Seabug, it could be an issue
-        -- down the road as we track all types of Addresses properly
         let
+          address = case skh of
+            Just skh' -> payPubKeyHashBaseAddress networkId pkh skh'
+            Nothing -> payPubKeyHashEnterpriseAddress networkId pkh
           txOut = TransactionOutput
-            { address: payPubKeyHashEnterpriseAddress networkId pkh
+            { address
             , amount
             , dataHash
             }
@@ -1028,10 +1037,10 @@ processConstraint mpsMap osMap = do
   -- unit. Calling Ogmios is an outstanding issue:
   -- https://github.com/Plutonomicon/cardano-transaction-lib/issues/174
   scriptExUnits :: ExUnits
-  scriptExUnits = { mem: fromInt 2000000, steps: fromInt 1000000000 }
+  scriptExUnits = { mem: fromInt 3000000, steps: fromInt 1500000000 }
 
   mintExUnits :: ExUnits
-  mintExUnits = { mem: fromInt 2000000, steps: fromInt 1000000000 }
+  mintExUnits = { mem: fromInt 3000000, steps: fromInt 1500000000 }
 
 -- Attach a Datum, Redeemer, or PlutusScript depending on the handler. They
 -- share error type anyway.

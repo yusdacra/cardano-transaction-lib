@@ -25,13 +25,13 @@ module Contract.Transaction
 import Prelude
 
 import BalanceTx (BalanceTxError) as BalanceTxError
-import BalanceTx (balanceTx) as BalanceTx
-import Contract.Monad (Contract, liftedE', liftedM, wrapContract)
+import BalanceTx (BalanceTxError, balanceTx) as BalanceTx
+import Contract.Monad (Contract, liftedE, liftedM, wrapContract)
 import Data.Either (Either, hush)
 import Data.Generic.Rep (class Generic)
 import Data.Lens.Getter ((^.))
 import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\))
 import QueryM (EvaluatedTransaction)
@@ -63,8 +63,11 @@ import TxOutput
   ) as TxOutput
 import Types.ByteArray (ByteArray)
 import Types.Datum (Datum)
-import Types.ScriptLookups (MkUnbalancedTxError(..), mkUnbalancedTx) as ScriptLookups
-import Types.ScriptLookups (UnattachedUnbalancedTx(UnattachedUnbalancedTx))
+import Types.ScriptLookups
+  ( MkUnbalancedTxError(..) -- A lot errors so will refrain from explicit names.
+  , UnattachedUnbalancedTx(UnattachedUnbalancedTx)
+  , mkUnbalancedTx
+  ) as ScriptLookups
 import Types.Transaction
   ( AuxiliaryData(AuxiliaryData)
   , AuxiliaryDataHash(AuxiliaryDataHash)
@@ -98,7 +101,7 @@ import Types.Transaction
       , TimelockStart
       , TimelockExpiry
       )
-  , Nonce(Nonce)
+  , Nonce(IdentityNonce, HashNonce)
   , ProposedProtocolParameterUpdates(ProposedProtocolParameterUpdates)
   , ProtocolParamUpdate
   , ProtocolVersion
@@ -175,8 +178,11 @@ signTransactionBytes = wrapContract <<< QueryM.signTransactionBytes
 
 -- | Submits a Cbor-hex encoded transaction, which is the output of
 -- | `signTransactionBytes` or `balanceAndSignTx`
-submit :: forall (r :: Row Type). EvaluatedTransaction -> Contract r String
-submit = wrapContract <<< QueryM.submitTxOgmios
+submit
+  :: forall (r :: Row Type)
+   . EvaluatedTransaction
+  -> Contract r Transaction.TransactionHash
+submit = wrapContract <<< map (wrap <<< unwrap) <<< QueryM.submitTxOgmios
 
 -- | Query the Haskell server for the minimum transaction fee
 calculateMinFee
@@ -194,7 +200,7 @@ calculateMinFeeM = map hush <<< calculateMinFee
 balanceTx
   :: forall (r :: Row Type)
    . UnbalancedTx
-  -> Contract r (Either BalanceTxError.BalanceTxError Transaction)
+  -> Contract r (Either BalanceTx.BalanceTxError Transaction)
 balanceTx = wrapContract <<< BalanceTx.balanceTx
 
 -- | Attempts to balance an `UnbalancedTx` hushing the error.
@@ -247,14 +253,16 @@ instance Show BalancedSignedTransaction where
 -- | submit  the transaction.
 balanceAndSignTx
   :: forall (r :: Row Type)
-   . UnattachedUnbalancedTx
+   . ScriptLookups.UnattachedUnbalancedTx
   -> Contract r (Maybe BalancedSignedTransaction)
 balanceAndSignTx
-  (UnattachedUnbalancedTx { unbalancedTx, datums, redeemersTxIns }) = do
+  ( ScriptLookups.UnattachedUnbalancedTx
+      { unbalancedTx, datums, redeemersTxIns }
+  ) = do
   -- Balance unbalanced tx:
-  balancedTx <- liftedE' $ balanceTx unbalancedTx
+  balancedTx <- liftedE $ balanceTx unbalancedTx
   let inputs = balancedTx ^. _body <<< _inputs
-  redeemers <- liftedE' $ reindexSpentScriptRedeemers inputs redeemersTxIns
+  redeemers <- liftedE $ reindexSpentScriptRedeemers inputs redeemersTxIns
   -- Reattach datums and redeemer:
   QueryM.FinalizedTransaction txCbor <-
     liftedM "balanceAndSignTx: Cannot attach datums and redeemer"

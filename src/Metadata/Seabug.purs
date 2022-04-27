@@ -22,15 +22,15 @@ import ToData (class ToData, toData)
 import Serialization.Hash (ScriptHash, scriptHashFromBytes)
 import Types.ByteArray
   ( ByteArray
-  , byteArrayFromString
   , hexToByteArray
   , hexToByteArrayUnsafe
   )
 import Types.Natural (Natural)
-import Types.PlutusData (PlutusData(Bytes, Map))
+import Types.PlutusData (PlutusData(Map))
 import Types.Scripts (MintingPolicyHash, ValidatorHash)
 import Types.UnbalancedTransaction (PubKeyHash)
 import Types.Value (CurrencySymbol, TokenName, mkTokenName, mkCurrencySymbol)
+import Metadata.Helpers (unsafeMkKey, lookupKey)
 
 newtype SeabugMetadata = SeabugMetadata
   { policyId :: MintingPolicyHash
@@ -55,29 +55,27 @@ instance Show SeabugMetadata where
 
 instance ToData SeabugMetadata where
   toData (SeabugMetadata meta) = unsafePartial $ toData $ Map.fromFoldable
-    [ mkKey "727" /\ Map.fromFoldable
+    [ unsafeMkKey "727" /\ Map.fromFoldable
         [ meta.policyId /\ Map.fromFoldable
-            [ mkKey "mintPolicy" /\ toData meta.mintPolicy
-            , mkKey "collectionNftCS" /\ toData meta.collectionNftCS
-            , mkKey "collectionNftTN" /\ toData meta.collectionNftTN
-            , mkKey "lockingScript" /\ toData meta.lockingScript
-            , mkKey "authorPkh" /\ toData meta.authorPkh
-            , mkKey "authorShare" /\ toData meta.authorShare
-            , mkKey "marketplaceScript" /\ toData meta.marketplaceScript
-            , mkKey "marketplaceShare" /\ toData meta.marketplaceShare
-            , mkKey "ownerPkh" /\ toData meta.ownerPkh
-            , mkKey "ownerPrice" /\ toData meta.ownerPrice
+            [ unsafeMkKey "mintPolicy" /\ toData meta.mintPolicy
+            , unsafeMkKey "collectionNftCS" /\ toData meta.collectionNftCS
+            , unsafeMkKey "collectionNftTN" /\ toData meta.collectionNftTN
+            , unsafeMkKey "lockingScript" /\ toData meta.lockingScript
+            , unsafeMkKey "authorPkh" /\ toData meta.authorPkh
+            , unsafeMkKey "authorShare" /\ toData meta.authorShare
+            , unsafeMkKey "marketplaceScript" /\ toData meta.marketplaceScript
+            , unsafeMkKey "marketplaceShare" /\ toData meta.marketplaceShare
+            , unsafeMkKey "ownerPkh" /\ toData meta.ownerPkh
+            , unsafeMkKey "ownerPrice" /\ toData meta.ownerPrice
             ]
         ]
     ]
 
 instance FromData SeabugMetadata where
-  fromData (Map sm) = unsafePartial do
+  fromData sm = unsafePartial do
     policyId /\ contents <- lookupKey "727" sm >>= case _ of
-      Map mp1 -> case Map.toUnfoldable mp1 of
-        [ policyId /\ contents ] -> Tuple <$> fromData policyId <*> fromData
-          contents
-        _ -> Nothing
+      Map [ policyId /\ contents ] ->
+        Tuple <$> fromData policyId <*> fromData contents
       _ -> Nothing
     mintPolicy <- lookupKey "mintPolicy" contents >>= fromData
     collectionNftCS <- lookupKey "collectionNftCS" contents >>= fromData
@@ -102,7 +100,6 @@ instance FromData SeabugMetadata where
       , ownerPkh
       , ownerPrice
       }
-  fromData _ = Nothing
 
 instance DecodeJson SeabugMetadata where
   decodeJson =
@@ -152,7 +149,7 @@ instance DecodeJson SeabugMetadata where
             }
     where
     decodeShare :: Int -> Either Json.JsonDecodeError Share
-    decodeShare = note (Json.TypeMismatch "Expected int between 0 and 1000")
+    decodeShare = note (Json.TypeMismatch "Expected int between 0 and 10000")
       <<< mkShare
 
     decodeScriptHash :: String -> Either Json.JsonDecodeError ScriptHash
@@ -176,21 +173,19 @@ instance Show SeabugMetadataDelta where
 
 instance ToData SeabugMetadataDelta where
   toData (SeabugMetadataDelta meta) = unsafePartial $ toData $ Map.fromFoldable
-    [ mkKey "727" /\ Map.fromFoldable
+    [ unsafeMkKey "727" /\ Map.fromFoldable
         [ meta.policyId /\ Map.fromFoldable
-            [ mkKey "ownerPkh" /\ toData meta.ownerPkh
-            , mkKey "ownerPrice" /\ toData meta.ownerPrice
+            [ unsafeMkKey "ownerPkh" /\ toData meta.ownerPkh
+            , unsafeMkKey "ownerPrice" /\ toData meta.ownerPrice
             ]
         ]
     ]
 
 instance FromData SeabugMetadataDelta where
-  fromData (Map sm) = unsafePartial do
+  fromData sm = unsafePartial do
     policyId /\ contents <- lookupKey "727" sm >>= case _ of
-      Map mp1 -> case Map.toUnfoldable mp1 of
-        [ policyId /\ contents ] -> Tuple <$> fromData policyId <*> fromData
-          contents
-        _ -> Nothing
+      Map [ policyId /\ contents ] ->
+        Tuple <$> fromData policyId <*> fromData contents
       _ -> Nothing
     ownerPkh <- lookupKey "ownerPkh" contents >>= fromData
     ownerPrice <- lookupKey "ownerPrice" contents >>= fromData
@@ -199,11 +194,3 @@ instance FromData SeabugMetadataDelta where
       , ownerPkh
       , ownerPrice
       }
-  fromData _ = Nothing
-
-mkKey :: Partial => String -> PlutusData
-mkKey str = Bytes $ fromJust $ byteArrayFromString str
-
-lookupKey
-  :: Partial => String -> Map.Map PlutusData PlutusData -> Maybe PlutusData
-lookupKey keyStr = Map.lookup (mkKey keyStr)

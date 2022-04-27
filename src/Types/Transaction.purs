@@ -12,16 +12,24 @@ module Types.Transaction
   , ExUnitPrices
   , ExUnits
   , GeneralTransactionMetadata(..)
+  , GenesisDelegateHash(..)
   , GenesisHash(..)
+  , Ipv4(..)
+  , Ipv6(..)
   , Language(..)
   , Mint(..)
+  , MIRToStakeCredentials(..)
+  , MoveInstantaneousReward(..)
   , NativeScript(..)
   , Nonce(..)
+  , PoolMetadata(..)
+  , PoolMetadataHash(..)
   , ProposedProtocolParameterUpdates(..)
   , ProtocolParamUpdate
   , ProtocolVersion
   , PublicKey(..)
   , Redeemer(..)
+  , Relay(..)
   , RequiredSigner(..)
   , ScriptDataHash(..)
   , SubCoin
@@ -37,6 +45,7 @@ module Types.Transaction
   , UnitInterval
   , Update
   , Utxo
+  , URL(..)
   , UtxoM(..)
   , Vkey(..)
   , Vkeywitness(..)
@@ -81,7 +90,6 @@ import Data.Map as Map
 import Data.Maybe (Maybe(Nothing))
 import Data.Monoid (guard)
 import Data.Newtype (class Newtype)
-import Data.Rational (Rational)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(SProxy))
 import Data.Tuple (Tuple(Tuple))
@@ -89,15 +97,23 @@ import Data.Tuple.Nested (type (/\))
 import Data.UInt (UInt)
 import FromData (class FromData, fromData)
 import Helpers ((</>), (<<>>), appendMap, appendRightMap)
-import Serialization.Address (Address, NetworkId, RewardAddress, Slot(Slot))
+import Serialization.Address
+  ( Address
+  , NetworkId
+  , RewardAddress
+  , Slot(Slot)
+  , StakeCredential
+  )
 import Serialization.Hash (Ed25519KeyHash)
+import Serialization.Types (BigNum, VRFKeyHash)
 import ToData (class ToData, toData)
 import Types.Aliases (Bech32String)
 import Types.ByteArray (ByteArray, byteArrayToHex)
+import Types.Int as Int
+import Types.PlutusData (PlutusData(Constr))
 import Types.RedeemerTag (RedeemerTag)
 import Types.Scripts (PlutusScript)
 import Types.Value (Coin, NonAdaAsset, Value)
-import Types.PlutusData (PlutusData(Constr))
 
 --------------------------------------------------------------------------------
 -- `Transaction`
@@ -253,7 +269,7 @@ derive newtype instance Monoid Mint
 instance Show Mint where
   show = genericShow
 
-newtype AuxiliaryDataHash = AuxiliaryDataHash String
+newtype AuxiliaryDataHash = AuxiliaryDataHash ByteArray
 
 derive instance Generic AuxiliaryDataHash _
 derive instance Newtype AuxiliaryDataHash _
@@ -279,10 +295,11 @@ derive instance Generic ProposedProtocolParameterUpdates _
 instance Show ProposedProtocolParameterUpdates where
   show = genericShow
 
-newtype GenesisHash = GenesisHash String
+newtype GenesisHash = GenesisHash ByteArray
 
 derive instance Newtype GenesisHash _
 derive newtype instance Eq GenesisHash
+derive newtype instance Ord GenesisHash
 derive instance Generic GenesisHash _
 
 instance Show GenesisHash where
@@ -298,14 +315,14 @@ type ProtocolParamUpdate =
   , poolDeposit :: Maybe Coin
   , maxEpoch :: Maybe Epoch
   , nOpt :: Maybe UInt
-  , poolPledgeInfluence :: Maybe Rational
+  , poolPledgeInfluence :: Maybe UnitInterval
   , expansionRate :: Maybe UnitInterval
   , treasuryGrowthRate :: Maybe UnitInterval
   , d :: Maybe UnitInterval
   , extraEntropy :: Maybe Nonce
   , protocolVersion :: Maybe (Array ProtocolVersion)
-  , minPoolCost :: Maybe Coin
-  , adaPerUtxoByte :: Maybe Coin
+  , minPoolCost :: Maybe BigNum
+  , adaPerUtxoByte :: Maybe BigNum
   , costModels :: Maybe Costmdls
   , executionCosts :: Maybe ExUnitPrices
   , maxTxExUnits :: Maybe ExUnits
@@ -353,22 +370,22 @@ derive instance Generic CostModel _
 instance Show CostModel where
   show = genericShow
 
-instance Show Nonce where
-  show = genericShow
-
 type ProtocolVersion =
   { major :: UInt
   , minor :: UInt
   }
 
-newtype Nonce = Nonce String
+-- Following CSL Nonce is either None or a 32 byte hash
+data Nonce = IdentityNonce | HashNonce ByteArray
 
-derive instance Newtype Nonce _
-derive newtype instance Eq Nonce
+derive instance Eq Nonce
+
+instance Show Nonce where
+  show = genericShow
 
 type UnitInterval =
-  { numerator :: BigInt
-  , denominator :: BigInt
+  { numerator :: BigNum
+  , denominator :: BigNum
   }
 
 newtype Epoch = Epoch UInt
@@ -380,14 +397,129 @@ derive newtype instance Eq Epoch
 instance Show Epoch where
   show = genericShow
 
+newtype Ipv4 = Ipv4 ByteArray
+
+derive instance Eq Ipv4
+derive instance Generic Ipv4 _
+derive instance Newtype Ipv4 _
+
+instance Show Ipv4 where
+  show = genericShow
+
+newtype Ipv6 = Ipv6 ByteArray
+
+derive instance Eq Ipv6
+derive instance Generic Ipv6 _
+derive instance Newtype Ipv6 _
+
+instance Show Ipv6 where
+  show = genericShow
+
+data Relay
+  = SingleHostAddr
+      { port :: Maybe Int
+      , ipv4 :: Maybe Ipv4
+      , ipv6 :: Maybe Ipv6
+      }
+  | SingleHostName
+      { port :: Maybe Int
+      , dnsName :: String
+      }
+  | MultiHostName { dnsName :: String }
+
+derive instance Eq Relay
+derive instance Generic Relay _
+
+instance Show Relay where
+  show = genericShow
+
+newtype URL = URL String
+
+derive instance Eq URL
+derive instance Generic URL _
+derive instance Newtype URL _
+
+instance Show URL where
+  show = genericShow
+
+newtype PoolMetadataHash = PoolMetadataHash ByteArray
+
+derive instance Eq PoolMetadataHash
+derive instance Generic PoolMetadataHash _
+derive instance Newtype PoolMetadataHash _
+
+instance Show PoolMetadataHash where
+  show = genericShow
+
+newtype PoolMetadata = PoolMetadata
+  { url :: URL
+  , hash :: PoolMetadataHash
+  }
+
+derive instance Eq PoolMetadata
+derive instance Generic PoolMetadata _
+
+instance Show PoolMetadata where
+  show = genericShow
+
+newtype GenesisDelegateHash = GenesisDelegateHash ByteArray
+
+derive instance Eq GenesisDelegateHash
+derive instance Generic GenesisDelegateHash _
+
+instance Show GenesisDelegateHash where
+  show = genericShow
+
+newtype MIRToStakeCredentials = MIRToStakeCredentials
+  (Map StakeCredential Int.Int)
+
+derive instance Eq MIRToStakeCredentials
+derive instance Generic MIRToStakeCredentials _
+
+instance Show MIRToStakeCredentials where
+  show = genericShow
+
+data MoveInstantaneousReward
+  = ToOtherPot
+      { pot :: Number
+      , amount :: BigNum
+      }
+  | ToStakeCreds
+      { pot :: Number
+      , amounts :: MIRToStakeCredentials
+      }
+
+derive instance Eq MoveInstantaneousReward
+derive instance Generic MoveInstantaneousReward _
+
+instance Show MoveInstantaneousReward where
+  show = genericShow
+
 data Certificate
-  = StakeRegistration
-  | StakeDeregistration
-  | StakeDelegation
+  = StakeRegistration StakeCredential
+  | StakeDeregistration StakeCredential
+  | StakeDelegation StakeCredential Ed25519KeyHash
   | PoolRegistration
+      { operator :: Ed25519KeyHash
+      , vrfKeyhash :: VRFKeyHash
+      , pledge :: BigNum
+      , cost :: BigNum
+      , margin :: UnitInterval
+      , reward_account :: RewardAddress
+      , poolOwners :: Array Ed25519KeyHash
+      , relays :: Array Relay
+      , poolMetadata :: Maybe PoolMetadata
+      }
   | PoolRetirement
+      { poolKeyhash :: Ed25519KeyHash
+      , epoch :: Epoch
+      }
   | GenesisKeyDelegation
-  | MoveInstantaneousRewardsCert
+      { genesisHash :: GenesisHash
+      , genesisDelegateHash :: GenesisDelegateHash
+      , vrfKeyhash :: VRFKeyHash
+      }
+  | MoveInstantaneousRewardsCert MoveInstantaneousReward
 
 derive instance Eq Certificate
 derive instance Generic Certificate _
@@ -518,7 +650,7 @@ type BootstrapWitness =
   , attributes :: ByteArray
   }
 
-newtype RequiredSigner = RequiredSigner Vkey
+newtype RequiredSigner = RequiredSigner Ed25519KeyHash
 
 derive instance Newtype RequiredSigner _
 derive newtype instance Eq RequiredSigner
@@ -643,11 +775,12 @@ instance Show TransactionMetadatumLabel where
 data TransactionMetadatum
   = MetadataMap (Map TransactionMetadatum TransactionMetadatum)
   | MetadataList (Array TransactionMetadatum)
-  | Int Int
+  | Int BigInt
   | Bytes ByteArray
   | Text String
 
 derive instance Eq TransactionMetadatum
+derive instance Ord TransactionMetadatum
 derive instance Generic TransactionMetadatum _
 
 instance Show TransactionMetadatum where

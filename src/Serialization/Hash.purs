@@ -11,6 +11,7 @@ module Serialization.Hash
   , scriptHashFromBytes
   , scriptHashFromBech32
   , scriptHashToBech32
+  , scriptHashAsBytes
   ) where
 
 import Prelude
@@ -26,7 +27,6 @@ import Data.Function (on)
 import Data.Maybe (Maybe(Nothing))
 import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
 import FromData (class FromData)
-import Serialization.Csl (class ToCsl)
 import ToData (class ToData, toData)
 import Types.Aliases (Bech32String)
 import Types.ByteArray (ByteArray, byteArrayToHex, hexToByteArray)
@@ -45,9 +45,6 @@ instance Ord Ed25519KeyHash where
 instance Show Ed25519KeyHash where
   show edkh = "(Ed25519KeyHash " <> byteArrayToHex (ed25519KeyHashToBytes edkh)
     <> ")"
-
-instance ToCsl Ed25519KeyHash Ed25519KeyHash where
-  toCslRep = identity
 
 instance ToData Ed25519KeyHash where
   toData = toData <<< ed25519KeyHashToBytes
@@ -116,9 +113,6 @@ instance Ord ScriptHash where
 instance Show ScriptHash where
   show edkh = "(ScriptHash " <> byteArrayToHex (scriptHashToBytes edkh) <> ")"
 
-instance ToCsl ScriptHash ScriptHash where
-  toCslRep = identity
-
 instance ToData ScriptHash where
   toData = toData <<< scriptHashToBytes
 
@@ -144,6 +138,10 @@ foreign import _scriptHashFromBech32Impl
   -> Bech32String
   -> Maybe ScriptHash
 
+-- | Drops the type and returns the hash as a generic bytearray
+foreign import scriptHashAsBytes :: ScriptHash -> ByteArray
+
+-- | Encodes the hash to Cbor bytes
 foreign import scriptHashToBytes :: ScriptHash -> ByteArray
 
 -- | Convert scriptHash to Bech32 representation with given prefix.
@@ -160,9 +158,12 @@ foreign import _scriptHashToBech32Impl
   -> ScriptHash
   -> Maybe Bech32String
 
+-- | Decodes a script hash from its CBOR bytes encoding
+-- | NOTE. It does _not_ compute hash of given bytes.
 scriptHashFromBytes :: ByteArray -> Maybe ScriptHash
 scriptHashFromBytes = _scriptHashFromBytesImpl maybeFfiHelper
 
+-- | Decodes a script hash from its Bech32 representation
 scriptHashFromBech32 :: Bech32String -> Maybe ScriptHash
 scriptHashFromBech32 = _scriptHashFromBech32Impl maybeFfiHelper
 

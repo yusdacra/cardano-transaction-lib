@@ -2,14 +2,6 @@
   description = "cardano-transaction-lib";
 
   inputs = {
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
-      flake = false;
-    };
-    flake-compat-ci.url = "github:hercules-ci/flake-compat-ci";
-
-    nixpkgs.url = "github:NixOS/nixpkgs/dde1557825c5644c869c5efc7448dc03722a8f09";
-
     # for the purescript project
     ogmios.url = "github:mlabs-haskell/ogmios/c4f896bf32ad066be8edd8681ee11e4ab059be7f";
     ogmios-datum-cache = {
@@ -33,8 +25,8 @@
 
     # for the haskell server
     iohk-nix.url = "github:input-output-hk/iohk-nix";
-    haskell-nix.url = "github:L-as/haskell.nix?ref=master";
-    nixpkgs-unstable.follows = "haskell-nix/nixpkgs-unstable";
+    haskell-nix.url = "github:mlabs-haskell/haskell.nix?ref=master";
+    nixpkgs.follows = "haskell-nix/nixpkgs-unstable";
     cardano-addresses = {
       url =
         "github:input-output-hk/cardano-addresses/d2f86caa085402a953920c6714a0de6a50b655ec";
@@ -112,8 +104,8 @@
     };
     # NOTE
     # I don't we need anything from `plutus-apps`, so the following two are
-    # not necessary. If we go with Servant for the server, though, they might
-    # be useful for communicating with the frontend
+    # not necessary. They might be useful for communicating with the frontend
+    # however in case this is needed
     purescript-bridge = {
       url =
         "github:shmish111/purescript-bridge/6a92d7853ea514be8b70bab5e72077bf5a510596";
@@ -136,16 +128,28 @@
     , nixpkgs
     , haskell-nix
     , iohk-nix
-    , flake-compat-ci
     , ...
     }@inputs:
     let
       defaultSystems = [ "x86_64-linux" "x86_64-darwin" ];
       perSystem = nixpkgs.lib.genAttrs defaultSystems;
+      overlay = system: with inputs; (prev: final: {
+        easy-ps =
+          import inputs.easy-purescript-nix { pkgs = prev; };
+        ogmios-datum-cache =
+          nixpkgs.legacyPackages.${system}.haskellPackages.callPackage
+            ogmios-datum-cache
+            { };
+        ogmios = ogmios.packages.${system}."ogmios:exe:ogmios";
+        cardano-cli = cardano-node-exe.packages.${system}.cardano-cli;
+        purescriptProject = import ./nix { inherit system; pkgs = prev; };
+        inherit cardano-configurations;
+      });
       nixpkgsFor = system: import nixpkgs {
         overlays = [
           haskell-nix.overlay
           iohk-nix.overlays.crypto
+          (overlay system)
         ];
         inherit (haskell-nix) config;
         inherit system;
@@ -153,11 +157,79 @@
       psProjectFor = system:
         let
           pkgs = nixpkgsFor system;
-          src = ./.;
+          src = self;
+          project = pkgs.purescriptProject {
+            inherit src pkgs;
+            projectName = "cardano-transaction-lib";
+            shell = {
+              packages = [
+                pkgs.ogmios
+                pkgs.cardano-cli
+                pkgs.ogmios-datum-cache
+                pkgs.nixpkgs-fmt
+                pkgs.fd
+              ];
+
+              shellHook =
+                let
+                  nodeModules = project.mkNodeModules { };
+                in
+                ''
+                  __ln-testnet-config () {
+                    local cfgdir=./.node-cfg
+                    if test -e "$cfgdir"; then
+                      rm -r "$cfgdir"
+                    fi
+
+                    mkdir -p "$cfgdir"/testnet/{config,genesis}
+
+                    ln -s ${pkgs.cardano-configurations}/network/testnet/cardano-node/config.json \
+                      "$cfgdir"/testnet/config/config.json
+                    ln -s ${pkgs.cardano-configurations}/network/testnet/genesis/byron.json \
+                      "$cfgdir"/testnet/genesis/byron.json
+                    ln -s ${pkgs.cardano-configurations}/network/testnet/genesis/shelley.json \
+                      "$cfgdir"/testnet/genesis/shelley.json
+                  }
+
+                  __ln-testnet-config
+
+                  export CARDANO_NODE_SOCKET_PATH="$PWD"/.node/socket/node.socket
+                  export CARDANO_NODE_CONFIG="$PWD"/.node-cfg/testnet/config/config.json
+
+                '';
+            };
+          };
         in
-        import ./nix {
-          inherit src pkgs inputs system self;
+        rec {
+          defaultPackage = packages.cardano-transaction-lib;
+
+          packages = {
+            cardano-transaction-lib = project.buildPursProject {
+              # Make sure the entire project compiles
+              sources = [ "src" "test" "examples" ];
+            };
+
+            ctl-example-bundle-web = project.bundlePursProject {
+              sources = [ "src" "examples" ];
+              main = "Examples.Pkh2Pkh";
+              entrypoint = "examples/index.js";
+              htmlTemplate = "examples/index.html";
+            };
+          };
+
+          # FIXME
+          # Once we have ogmios/node instances available, we should also include a
+          # test. This will need to be run via a Hercules `effect`
+          checks = {
+            ctl-unit-test = project.runPursTest {
+              testMain = "Test.Unit";
+              sources = [ "src" "test" "fixtures" ];
+            };
+          };
+
+          devShell = project.devShell;
         };
+
       hsProjectFor = system:
         let
           pkgs = nixpkgsFor system;
@@ -171,39 +243,23 @@
       # flake from haskell.nix project
       hsFlake = perSystem (system: (hsProjectFor system).flake { });
 
-      devShell = perSystem (system: (psProjectFor system).devShell);
+      devShell = perSystem (system: self.devShells.${system}.ctl);
+
+      devShells = perSystem (system: {
+        # This is the default `devShell` and can be run without specifying
+        # it (i.e. `nix develop`)
+        ctl = (psProjectFor system).devShell;
+        # It might be a good idea to keep this as a separate shell; if you're
+        # working on the PS frontend, it doesn't make a lot of sense to pull
+        # in all of the Haskell dependencies
+        #
+        # This can be used with `nix develop .#hsDevShell
+        hsDevShell = self.hsFlake.${system}.devShell;
+      });
 
       packages = perSystem (system:
-        let
-          pkgs = nixpkgsFor system;
-          easy-ps = import inputs.easy-purescript-nix { inherit pkgs; };
-          formatting-check = pkgs.runCommand "formatting-check"
-            {
-              nativeBuildInputs = [
-                easy-ps.purs-tidy
-                pkgs.haskellPackages.fourmolu
-                pkgs.nixpkgs-fmt
-              ];
-            }
-            ''
-              cd ${self}
-              purs-tidy check $(find ./* -iregex '.*.purs')
-              fourmolu -m check -o -XTypeApplications -o -XImportQualifiedPost \
-                $(find ./server -iregex '.*.hs')
-              nixpkgs-fmt --check ./{flake,default,shell}.nix \
-                 $(find ./nix ./server -iregex '.*.nix')
-              touch $out
-            '';
-          # It might be a good idea to keep this as a separate shell; if you're
-          # working on the PS frontend, it doesn't make a lot of sense to pull
-          # in all of the Haskell dependencies
-          #
-          # This can be used with `nix develop .#hsDevShell
-          hsDevShell = self.hsFlake.${system}.devShell;
-        in
         self.hsFlake.${system}.packages
         // (psProjectFor system).packages
-        // { inherit formatting-check hsDevShell; }
       );
 
       apps = perSystem (system: {
@@ -211,11 +267,48 @@
           (self.hsFlake.${system}.apps) "ctl-server:exe:ctl-server";
       });
 
+      checks = perSystem (system:
+        let
+          pkgs = nixpkgsFor system;
+        in
+        (psProjectFor system).checks
+        // self.hsFlake.${system}.checks
+        // {
+          formatting-check = pkgs.runCommand "formatting-check"
+            {
+              nativeBuildInputs = with pkgs; [
+                easy-ps.purs-tidy
+                haskellPackages.fourmolu
+                nixpkgs-fmt
+                fd
+              ];
+            }
+            ''
+              cd ${self}
+              purs-tidy check $(fd -epurs)
+              fourmolu -m check -o -XTypeApplications -o -XImportQualifiedPost \
+                $(fd -ehs)
+              nixpkgs-fmt --check $(fd -enix --exclude='spago*')
+              touch $out
+            '';
+        });
+
+      check = perSystem (system:
+        (nixpkgsFor system).runCommand "combined-check"
+          {
+            nativeBuildInputs =
+              builtins.attrValues self.checks.${system}
+              ++ builtins.attrValues self.packages.${system};
+          }
+          ''
+            touch $out
+          ''
+      );
+
       defaultPackage = perSystem (system: (psProjectFor system).defaultPackage);
 
-      ci = flake-compat-ci.lib.recurseIntoFlakeWith {
-        flake = self;
-        systems = [ "x86_64-linux" ];
-      };
+      overlay = perSystem overlay;
+
+      herculesCI.ciSystems = [ "x86_64-linux" ];
     };
 }
