@@ -61,7 +61,7 @@ import Contract.Value as Value
 import Contract.Wallet (mkNamiWalletAff)
 import Data.BigInt as BigInt
 import Data.Map as Map
-import QueryM (EvaluatedTransaction(..))
+import QueryM (EvaluatedTransaction(EvaluatedTransaction))
 
 main :: Effect Unit
 main = launchAff_ $ do

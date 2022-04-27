@@ -37,7 +37,7 @@ import Data.Tuple.Nested (type (/\))
 import QueryM (EvaluatedTransaction)
 import QueryM
   ( FeeEstimate(FeeEstimate)
-  , ClientError(..)
+  , ClientError(..) -- implicit as this error list will likely increase.
   , FinalizedTransaction(FinalizedTransaction)
   ) as ExportQueryM
 import QueryM
