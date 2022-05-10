@@ -263,8 +263,10 @@ balanceAndSignTx
   QueryM.FinalizedTransaction txCbor <-
     liftedM "balanceAndSignTx: Cannot attach datums and redeemer"
       (finalizeTx balancedTx datums redeemers)
+  log "Attached datums and redeemers"
   -- Sign the transaction returned as Cbor-hex encoded:
   signedTxCbor <- liftedM "balanceAndSignTx: Failed to sign transaction" $
     signTransactionBytes txCbor
+  log "Tx signed"
   pure $ pure $ BalancedSignedTransaction
     { transaction: balancedTx, signedTxCbor }
