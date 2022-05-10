@@ -57,6 +57,7 @@ module QueryM
 
 import Prelude
 
+import Effect.Class.Console (log)
 import Aeson as Aeson
 import Affjax as Affjax
 import Affjax.RequestBody as Affjax.RequestBody
@@ -552,6 +553,9 @@ finalizeTx tx datums redeemers = do
   encodedRedeemers <- liftEffect $
     byteArrayToHex <<< Serialization.toBytes <<< asOneOf <$>
       Serialization.convertRedeemers redeemers
+  log $ "txHex " <> txHex
+  log $ "encodedDatums " <> show encodedDatums
+  log $ "encodedRedeemers " <> encodedRedeemers
   -- construct payload
   let
     body
