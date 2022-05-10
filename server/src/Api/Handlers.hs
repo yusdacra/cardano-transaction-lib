@@ -6,6 +6,9 @@ module Api.Handlers (
   hashData,
   hashScript,
   blake2bHash,
+  decodeCborTextLazyBS,
+  decodeCborRedeemers,
+  throwDecodeErrorWithMessage,
   finalizeTx,
 ) where
 
@@ -107,7 +110,7 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
     throwDecodeErrorWithMessage "Failed to decode datums" $
       traverse decodeCborDatum datums
   liftIO . putStrLn $ "Haskell server decodedDatums: " <> show decodedDatums
-  let languages = Set.fromList [PlutusV1]
+  let languages = if TxWitness.nullRedeemers decodedRedeemers then mempty else Set.fromList [PlutusV1]
       txDatums =
         TxWitness.TxDats . Map.fromList $
           decodedDatums <&> \datum -> (Data.hashData datum, datum)
