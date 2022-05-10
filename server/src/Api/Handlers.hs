@@ -111,12 +111,19 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
       txDatums =
         TxWitness.TxDats . Map.fromList $
           decodedDatums <&> \datum -> (Data.hashData datum, datum)
-      mbIntegrityHash =
-        Tx.hashScriptIntegrity
-          (C.toLedgerPParams C.ShelleyBasedEraAlonzo pparams)
-          languages
-          decodedRedeemers
-          txDatums
+      mbIntegrityHash = case TxWitness.nullRedeemers decodedRedeemers of
+        True ->
+          Tx.hashScriptIntegrity
+            (C.toLedgerPParams C.ShelleyBasedEraAlonzo pparams)
+            languages
+            (TxWitness.Redeemers mempty)
+            txDatums
+        False ->
+           Tx.hashScriptIntegrity
+            (C.toLedgerPParams C.ShelleyBasedEraAlonzo pparams)
+            languages
+            decodedRedeemers
+            txDatums
   let addIntegrityHash t =
         t
           { Tx.body =
@@ -124,15 +131,26 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
                 & \body -> body {Tx.scriptIntegrityHash = mbIntegrityHash}
           }
       addDatumsAndRedeemers t =
-        t
-          { Tx.wits =
-              Tx.wits t
-                & \witness ->
-                  witness
-                    { TxWitness.txdats = txDatums
-                    , TxWitness.txrdmrs = decodedRedeemers
-                    }
-          }
+        case TxWitness.nullRedeemers decodedRedeemers of
+          True ->
+            t
+              { Tx.wits =
+                  Tx.wits t
+                    & \witness ->
+                      witness
+                        { TxWitness.txdats = txDatums
+                        }
+              }
+          False ->
+            t
+              { Tx.wits =
+                  Tx.wits t
+                    & \witness ->
+                      witness
+                        { TxWitness.txdats = txDatums
+                        , TxWitness.txrdmrs = decodedRedeemers
+                        }
+              }
       finalizedTx = addIntegrityHash $ addDatumsAndRedeemers decodedTx
       response =
         FinalizedTransaction . encodeCborText . Cbor.serializeEncoding $
