@@ -9,7 +9,6 @@ module Api.Handlers (
   finalizeTx,
 ) where
 
-import Control.Monad.IO.Class (liftIO)
 import Cardano.Api qualified as C
 import Cardano.Api.Shelley qualified as Shelley
 import Cardano.Binary (Annotator (runAnnotator), FullByteString (Full))
@@ -24,6 +23,7 @@ import Cardano.Ledger.SafeHash qualified as SafeHash
 import Codec.CBOR.Read (deserialiseFromBytes)
 import Control.Lens
 import Control.Monad.Catch (throwM)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (asks)
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
@@ -94,6 +94,7 @@ blake2bHash (BytesToHash hs) =
 finalizeTx :: FinalizeRequest -> AppM FinalizedTransaction
 finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
   pparams <- asks protocolParams
+  liftIO . putStrLn $ "Haskell server begin finalizeTx"
   decodedTx <-
     throwDecodeErrorWithMessage "Failed to decode tx" $
       decodeCborValidatedTx tx
@@ -101,9 +102,11 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
   decodedRedeemers <-
     throwDecodeErrorWithMessage "Failed to decode redeemers" $
       decodeCborRedeemers redeemers
+  liftIO . putStrLn $ "Haskell server decodedRedeemers: " <> show decodedRedeemers
   decodedDatums <-
     throwDecodeErrorWithMessage "Failed to decode datums" $
       traverse decodeCborDatum datums
+  liftIO . putStrLn $ "Haskell server decodedDatums: " <> show decodedDatums
   let languages = Set.fromList [PlutusV1]
       txDatums =
         TxWitness.TxDats . Map.fromList $
