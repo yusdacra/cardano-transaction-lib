@@ -21,7 +21,7 @@ module Contract.Transaction
   , submit
   ) where
 
-import Prelude
+import Contract.Prelude
 
 import BalanceTx (balanceTx) as BalanceTx
 import BalanceTx (BalanceTxError) as BalanceTxError
@@ -254,7 +254,11 @@ balanceAndSignTx
   -- Balance unbalanced tx:
   balancedTx <- liftedE $ balanceTx unbalancedTx
   let inputs = balancedTx ^. _body <<< _inputs
+  log $ "redeemersTxIn" <> show redeemersTxIns
   redeemers <- liftedE $ reindexSpentScriptRedeemers inputs redeemersTxIns
+  log $ "reindexed redeemers " <> show redeemers
+  log $ "datums " <> show datums
+  log $ "balancedTx: " <> show balancedTx
   -- Reattach datums and redeemer:
   QueryM.FinalizedTransaction txCbor <-
     liftedM "balanceAndSignTx: Cannot attach datums and redeemer"

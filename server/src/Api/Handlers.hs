@@ -9,6 +9,7 @@ module Api.Handlers (
   finalizeTx,
 ) where
 
+import Control.Monad.IO.Class (liftIO)
 import Cardano.Api qualified as C
 import Cardano.Api.Shelley qualified as Shelley
 import Cardano.Binary (Annotator (runAnnotator), FullByteString (Full))
@@ -96,6 +97,7 @@ finalizeTx (FinalizeRequest {tx, datums, redeemers}) = do
   decodedTx <-
     throwDecodeErrorWithMessage "Failed to decode tx" $
       decodeCborValidatedTx tx
+  liftIO . putStrLn $ "Haskell server DecodedTx: " <> show decodedTx
   decodedRedeemers <-
     throwDecodeErrorWithMessage "Failed to decode redeemers" $
       decodeCborRedeemers redeemers
