@@ -69,7 +69,7 @@ import Data.Argonaut (class DecodeJson, JsonDecodeError)
 import Data.Argonaut as Json
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Argonaut.Encode.Encoders (encodeString)
-import Data.Array (length)
+import Data.Array (length, null)
 import Data.Bifunctor (bimap, lmap)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
@@ -558,6 +558,7 @@ finalizeTx tx datums redeemers = do
   log $ "encodedRedeemers " <> encodedRedeemers
   -- construct payload
   let
+    encodedRedeemers' = if null redeemers then mempty else encodedRedeemers
     body
       :: { tx :: String
          , datums :: Array String
@@ -566,8 +567,9 @@ finalizeTx tx datums redeemers = do
     body =
       { tx: txHex
       , datums: encodedDatums
-      , redeemers: encodedRedeemers
+      , redeemers: encodedRedeemers'
       }
+  log $ "encodedRedeemers' " <> encodedRedeemers'
   url <- mkServerEndpointUrl "finalize"
   -- get response json
   jsonBody <-
