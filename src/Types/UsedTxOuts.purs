@@ -7,7 +7,9 @@ module Types.UsedTxOuts
   ( UsedTxOuts(UsedTxOuts)
   , TxOutRefCache
   , isTxOutRefUsed
+  , isTxOutRefUsed'    
   , lockTransactionInputs
+  , lockTransactionInputs'
   , newUsedTxOuts
   , unlockTxOutRefs
   , unlockTransactionInputs
@@ -17,8 +19,8 @@ import Cardano.Types.Transaction (Transaction)
 import Control.Alt ((<$>))
 import Control.Alternative (guard, pure)
 import Control.Bind (bind, (=<<), (>>=))
-import Control.Category ((<<<), (>>>))
-import Control.Monad.RWS (ask)
+import Control.Category ((<<<), (>>>), identity)
+import Control.Monad.RWS (ask, asks)
 import Control.Monad.Reader (class MonadAsk)
 import Data.Foldable (class Foldable, foldr)
 import Data.Function (($))
@@ -51,19 +53,23 @@ derive instance Newtype UsedTxOuts _
 
 -- | Creates a new empty filter.
 newUsedTxOuts
-  :: forall (m :: Type -> Type) (t :: Type -> Type)
+  :: forall (m :: Type -> Type)
    . MonadEffect m
   => m UsedTxOuts
 newUsedTxOuts = UsedTxOuts <$> liftEffect (Ref.new Map.empty)
 
+
+  
 -- | Mark transaction's inputs as used.
-lockTransactionInputs
+lockTransactionInputs'
   :: forall (m :: Type -> Type)
-   . MonadAsk UsedTxOuts m
+     (r :: Type)
+   . MonadAsk r m
   => MonadEffect m
-  => Transaction
+  => (r -> UsedTxOuts)
+  -> Transaction
   -> m Unit
-lockTransactionInputs tx =
+lockTransactionInputs' f tx =
   let
     updateCache :: TxOutRefCache -> TxOutRefCache
     updateCache cache = foldr
@@ -74,7 +80,17 @@ lockTransactionInputs tx =
       cache
       (txOutRefs tx)
   in
-    ask >>= (unwrap >>> Ref.modify_ updateCache >>> liftEffect)
+    asks f >>= (unwrap >>> Ref.modify_ updateCache >>> liftEffect)
+
+
+lockTransactionInputs
+  :: forall (m :: Type -> Type)
+   . MonadAsk UsedTxOuts m
+  => MonadEffect m
+  => Transaction
+  -> m Unit
+lockTransactionInputs = lockTransactionInputs' identity
+
 
 -- | Remove transaction's inputs used marks.
 unlockTransactionInputs
@@ -87,7 +103,7 @@ unlockTransactionInputs = txOutRefs >>> unlockTxOutRefs
 
 -- | Remove used marks from TxOutRefs given directly.
 unlockTxOutRefs
-  :: forall (m :: Type -> Type) (t :: Type -> Type) (a :: Type)
+  :: forall (m :: Type -> Type) (t :: Type -> Type)
    . MonadAsk UsedTxOuts m
   => MonadEffect m
   => Foldable t
@@ -109,6 +125,23 @@ unlockTxOutRefs txOutRefs' =
   in
     ask >>= (unwrap >>> Ref.modify_ updateCache >>> liftEffect)
 
+
+
+-- | Query if TransactionInput is marked as used.
+isTxOutRefUsed'
+  :: forall (m :: Type -> Type) (r :: Type)
+   . MonadAsk r m
+  => MonadEffect m
+  => (r -> UsedTxOuts)
+  -> { transactionId :: TransactionHash, index :: UInt }
+  -> m Boolean
+isTxOutRefUsed' f { transactionId, index } = do
+  cache <- liftEffect <<< Ref.read <<< unwrap =<< asks f
+  pure $ isJust $ do
+    indices <- Map.lookup transactionId cache
+    guard $ Set.member index indices
+
+
 -- | Query if TransactionInput is marked as used.
 isTxOutRefUsed
   :: forall (m :: Type -> Type) (a :: Type)
@@ -116,11 +149,8 @@ isTxOutRefUsed
   => MonadEffect m
   => { transactionId :: TransactionHash, index :: UInt }
   -> m Boolean
-isTxOutRefUsed { transactionId, index } = do
-  cache <- liftEffect <<< Ref.read <<< unwrap =<< ask
-  pure $ isJust $ do
-    indices <- Map.lookup transactionId cache
-    guard $ Set.member index indices
+isTxOutRefUsed = isTxOutRefUsed' identity
+
 
 txOutRefs
   :: Transaction -> Array { transactionId :: TransactionHash, index :: UInt }

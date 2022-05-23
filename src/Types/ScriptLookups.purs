@@ -62,7 +62,7 @@ import Data.Array (elemIndex, insert, toUnfoldable, zip)
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Either (Either(Left, Right), either, note)
-import Data.Foldable (foldM)
+import Data.Foldable (foldM, traverse_)
 import Data.Generic.Rep (class Generic)
 import Data.Lattice (join)
 import Data.Lens ((%=), (%~), (.=), (.~), (<>=))
@@ -168,6 +168,7 @@ import Types.UnbalancedTransaction
   , payPubKeyRequiredSigner
   )
 import TxOutput (transactionOutputToScriptOutput)
+import Types.UsedTxOuts (lockTransactionInputs', isTxOutRefUsed')
 
 -- Taken mainly from https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger-constraints/html/Ledger-Constraints-OffChain.html
 -- Plutus rev: cc72a56eafb02333c96f662581b57504f8f8992f via Plutus-apps (localhost): abe4785a4fc4a10ba0c4e6417f0ab9f1b4169b26
@@ -586,8 +587,12 @@ mkUnbalancedTx'
   => ScriptLookups a
   -> TxConstraints b b
   -> QueryM (Either MkUnbalancedTxError UnbalancedTx)
-mkUnbalancedTx' scriptLookups txConstraints =
-  runConstraintsM scriptLookups txConstraints <#> map _.unbalancedTx
+mkUnbalancedTx' scriptLookups txConstraints = do
+  ubtx <- runConstraintsM scriptLookups txConstraints <#> map _.unbalancedTx
+  traverse_ (lockTransactionInputs' (\c -> c.usedTxOuts)
+             <<< _.transaction
+             <<< unwrap) ubtx
+  pure ubtx
 
 -- | A newtype for the unbalanced transaction after creating one with datums
 -- | and redeemers not attached
@@ -715,7 +720,12 @@ addOwnInput
 addOwnInput (InputConstraint { txOutRef }) = do
   networkId <- getNetworkId
   runExceptT do
+
     ScriptLookups { txOutputs, typedValidator } <- use _lookups
+
+    used <- lift $ isTxOutRefUsed' _.usedTxOuts (unwrap txOutRef)
+    when used (throwError (TxOutRefLocked txOutRef))
+    
     -- Convert to Cardano type
     cTxOutputs <- liftM CannotConvertFromPlutusType
       (traverse fromPlutusType txOutputs)
@@ -729,7 +739,7 @@ addOwnInput (InputConstraint { txOutRef }) = do
     let value = typedTxOutRefValue typedTxOutRef
     -- Must be inserted in order. Hopefully this matches the order under CSL
     _cpsToTxBody <<< _inputs %= insert txOutRef
-    _valueSpentBalancesInputs <>= provide value
+    _valueSpentBalancesInputs <>= provide value  
 
 -- | Add a typed output and return its value.
 addOwnOutput
@@ -762,6 +772,7 @@ data MkUnbalancedTxError
   | ModifyTx ModifyTxError
   | TxOutRefNotFound TransactionInput
   | TxOutRefWrongType TransactionInput
+  | TxOutRefLocked TransactionInput
   | DatumNotFound DataHash
   | MintingPolicyNotFound MintingPolicyHash
   | MintingPolicyHashNotCurrencySymbol MintingPolicyHash

@@ -110,6 +110,7 @@ import Types.UnbalancedTransaction
   ( UnbalancedTx(UnbalancedTx)
   , _transaction
   )
+import Types.UsedTxOuts (lockTransactionInputs')
 import TxOutput (utxoIndexToUtxo)
 
 -- This module replicates functionality from
@@ -429,6 +430,9 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
       -- Sort inputs at the very end so it behaves as a Set.
       sortedUnsignedTx = fst unattachedTx'' # _body <<< _inputs %~ Array.sort
     -- Logs final balanced tx and returns it
+
+    lockTransactionInputs' _.usedTxOuts sortedUnsignedTx
+
     logTx "Post-balancing Tx " allUtxos sortedUnsignedTx
     except $ Right (unattachedTx'' # _1 .~ sortedUnsignedTx)
   where
