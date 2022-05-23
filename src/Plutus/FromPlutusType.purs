@@ -5,6 +5,15 @@ module Plutus.FromPlutusType
 
 import Prelude
 
+import Cardano.Types.Transaction
+  ( TransactionOutput(TransactionOutput)
+  , UtxoM(UtxoM)
+  ) as Cardano
+import Cardano.Types.TransactionUnspentOutput
+  ( TransactionUnspentOutput(TransactionUnspentOutput)
+  ) as Cardano
+import Cardano.Types.Value (Coin, Value) as Types
+import Cardano.Types.Value (NonAdaAsset, mkValue, mkNonAdaAssetsFromTokenMap)
 import Data.Array (head, partition, singleton)
 import Data.Identity (Identity(Identity))
 import Data.Map (fromFoldable) as Map
@@ -15,21 +24,25 @@ import Data.Tuple (snd) as Tuple
 import Data.Tuple.Nested ((/\))
 import Data.UInt (UInt, fromInt, toInt, (.&.), (.|.), shl, zshr)
 import Partial.Unsafe (unsafePartial)
-
-import Serialization.Address (Address) as Serialization
-import Serialization.Address (Pointer, addressFromBytes) as Serialization.Address
-import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
-
 import Plutus.Types.Address (Address) as Plutus
 import Plutus.Types.AddressHeaderType
-  ( AddressHeaderType(..)
+  ( AddressHeaderType
+      ( PaymentKeyHashStakeKeyHash
+      , ScriptHashStakeKeyHash
+      , PaymentKeyHashScriptHash
+      , ScriptHashScriptHash
+      , PaymentKeyHashPointer
+      , ScriptHashPointer
+      , PaymentKeyHash
+      , ScriptHash
+      )
   , addrHeaderTypeUInt
   )
+import Plutus.Types.AssocMap (lookup) as Plutus.AssocMap
 import Plutus.Types.Credential
   ( Credential(PubKeyCredential, ScriptCredential)
   , StakingCredential(StakingHash, StakingPtr)
   )
-import Plutus.Types.AssocMap (lookup) as Plutus.AssocMap
 import Plutus.Types.CurrencySymbol (adaSymbol, getCurrencySymbol) as Plutus
 import Plutus.Types.Transaction
   ( TransactionOutput(TransactionOutput)
@@ -40,7 +53,9 @@ import Plutus.Types.TransactionUnspentOutput
   ) as Plutus
 import Plutus.Types.Value (Coin, Value) as Plutus
 import Plutus.Types.Value (getValue) as Plutus.Value
-
+import Serialization.Address (Address) as Serialization
+import Serialization.Address (Pointer, addressFromBytes) as Serialization.Address
+import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
 import Types.ByteArray (ByteArray, byteArrayFromIntArrayUnsafe)
 import Types.CborBytes
   ( CborBytes
@@ -48,15 +63,6 @@ import Types.CborBytes
   , rawBytesAsCborBytes
   )
 import Types.TokenName (adaToken)
-import Cardano.Types.Transaction
-  ( TransactionOutput(TransactionOutput)
-  , UtxoM(UtxoM)
-  ) as Cardano
-import Cardano.Types.TransactionUnspentOutput
-  ( TransactionUnspentOutput(TransactionUnspentOutput)
-  ) as Cardano
-import Cardano.Types.Value (Coin, Value) as Types
-import Cardano.Types.Value (NonAdaAsset, mkValue, mkNonAdaAssetsFromTokenMap)
 
 class FromPlutusType :: (Type -> Type) -> Type -> Type -> Constraint
 class FromPlutusType f pt t | pt -> t, t pt -> f where

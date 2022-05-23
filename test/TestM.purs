@@ -13,9 +13,10 @@ import Control.Monad.Error.Class
 import Control.MonadZero (class MonadZero)
 import Control.Plus (class Plus)
 import Data.Const (Const)
-import Data.Either (Either(..))
-import Data.Identity (Identity(..))
+import Data.Either (Either(Left, Right), either)
+import Data.Identity (Identity)
 import Data.Medea (ValidationError(EmptyError))
+import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
 import Mote (MoteT)
 
@@ -40,11 +41,10 @@ derive newtype instance MonadError ValidationError ValidationM
 derive newtype instance MonadZero ValidationM
 derive newtype instance MonadPlus ValidationM
 instance Alt ValidationM where
-  alt (ValidationM first) (ValidationM second) = case runExceptT first of
-    (Identity (Right a)) -> pure a
-    (Identity (Left _)) -> case runExceptT second of
-      (Identity (Right a)) -> pure a
-      (Identity (Left e)) -> throwError e
+  alt (ValidationM first) (ValidationM second) =
+    case unwrap $ runExceptT first of
+      Right a -> pure a
+      Left _ -> either throwError pure $ unwrap $ runExceptT second
 
 instance Plus ValidationM where
   empty = throwError EmptyError
@@ -52,6 +52,4 @@ instance Plus ValidationM where
 instance Alternative ValidationM
 
 runValidationM :: forall (a :: Type). ValidationM a -> Either ValidationError a
-runValidationM (ValidationM etvia) = do
-  let (Identity eva) = runExceptT etvia
-  eva
+runValidationM (ValidationM etvia) = unwrap $ runExceptT etvia
