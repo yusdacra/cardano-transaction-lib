@@ -28,7 +28,10 @@ import Utils as Utils
 import QueryM (QueryM, getWalletCollateral, mkOgmiosRequest)
 import Serialization.Address (Address)
 import Types.Transaction (TransactionInput)
-import Types.TxOutput (ogmiosTxOutToTransactionOutput, txOutRefToTransactionInput)
+import Types.TxOutput
+  ( ogmiosTxOutToTransactionOutput
+  , txOutRefToTransactionInput
+  )
 import Types.UsedTxOuts (UsedTxOuts, isTxOutRefUsed)
 import Types.Wallet (Wallet(Nami))
 import QueryM.Ogmios as Ogmios
