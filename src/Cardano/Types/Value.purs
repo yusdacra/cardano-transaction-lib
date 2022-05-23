@@ -221,7 +221,7 @@ unsafeAdaSymbol = CurrencySymbol mempty
 -- | constructor is not exported
 mkCurrencySymbol :: ByteArray -> Maybe CurrencySymbol
 mkCurrencySymbol byteArr =
-  scriptHashFromBytes (wrap byteArr) *> pure (CurrencySymbol byteArr)
+  scriptHashFromBytes (wrap byteArr) $> CurrencySymbol byteArr
 
 -- Do not export. Create an Ada `CurrencySymbol` from a `ByteArray`
 mkUnsafeAdaSymbol :: ByteArray -> Maybe CurrencySymbol

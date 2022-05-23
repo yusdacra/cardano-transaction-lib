@@ -29,7 +29,7 @@ import Type.Proxy (Proxy(Proxy))
 import Type.Row (type (+))
 
 -- we could use the left side to store logs to get better error tracing
-type E v a = Either (Variant v) a
+type E (v :: Row Type) (a :: Type) = Either (Variant v) a
 
 type NotImplementedError r = (notImplementedError :: String | r)
 _notImplementedError = Proxy :: Proxy "notImplementedError"
@@ -59,7 +59,7 @@ traceAndHushAll
   => ExceptV v m a
   -> MaybeT m a
 traceAndHushAll act = MaybeT $ runExceptT act >>= case _ of
-  Left v -> traceM v *> pure Nothing
+  Left v -> traceM v $> Nothing
   Right a -> pure (pure a)
 
 -- | Lifts underlying monad to MaybeT allowing hushing selected errors.

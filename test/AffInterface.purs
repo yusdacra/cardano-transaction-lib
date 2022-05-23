@@ -97,11 +97,11 @@ testOgmiosDatumCacheFetcher =
 testUtxosAt :: OgmiosAddress -> Aff Unit
 testUtxosAt testAddr = case ogmiosAddressToAddress testAddr of
   Nothing -> liftEffect $ throw "Failed UtxosAt"
-  Just addr -> flip runQueryM (utxosAt addr *> pure unit) =<< traceQueryConfig
+  Just addr -> flip runQueryM (utxosAt addr $> unit) =<< traceQueryConfig
 
 testGetChainTip :: Aff Unit
 testGetChainTip = do
-  flip runQueryM (getChainTip *> pure unit) =<< traceQueryConfig
+  flip runQueryM (getChainTip $> unit) =<< traceQueryConfig
 
 testFromOgmiosAddress :: OgmiosAddress -> Aff Unit
 testFromOgmiosAddress testAddr = do
