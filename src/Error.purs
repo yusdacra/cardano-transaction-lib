@@ -11,19 +11,19 @@ module Error
   , noteE
   ) where
 
+import Prelude
+
 import Control.Monad.Cont (lift)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (ExceptT(ExceptT), runExceptT)
 import Control.Monad.Except.Checked (ExceptV, safe)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Data.Either (Either(Left, Right))
-import Data.Function (($))
 import Data.Identity (Identity)
-import Data.Maybe
+import Data.Maybe (Maybe(Nothing), maybe)
 import Data.Newtype (unwrap)
 import Data.Variant (Variant, inj)
 import Debug (class DebugWarning, traceM)
-import Prelude (class Monad, pure, (*>), (<<<), (>>=), (>>>))
 import Prim.TypeError (class Warn, Text)
 import Type.Proxy (Proxy(Proxy))
 import Type.Row (type (+))

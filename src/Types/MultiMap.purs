@@ -7,15 +7,11 @@ module Types.MultiMap
   , lookup
   ) where
 
-import Control.Alt (map)
-import Control.Bind ((>>=))
-import Control.Category ((>>>))
+import Prelude
+
 import Data.Array as Array
-import Data.Bounded (class Ord)
-import Data.Function (($))
 import Data.Map as Map
 import Data.Maybe (Maybe)
-import Data.Monoid ((<>))
 
 -- | A specific-use MultiMap where values for the same key are stored in FIFO container
 --   implemented via Array

@@ -4,7 +4,8 @@ module Plutus.Types.AddressHeaderType
   , addrHeaderType
   ) where
 
-import Prelude (class Eq, class Ord, (<<<))
+import Prelude
+
 import Data.Maybe (Maybe)
 import Data.UInt (UInt, fromInt, toInt)
 import Data.Show (class Show)

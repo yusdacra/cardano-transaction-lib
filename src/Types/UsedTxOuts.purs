@@ -13,31 +13,21 @@ module Types.UsedTxOuts
   , unlockTransactionInputs
   ) where
 
+import Prelude
+
 import Cardano.Types.Transaction (Transaction)
-import Control.Alt ((<$>))
-import Control.Alternative (guard, pure)
-import Control.Bind (bind, (=<<), (>>=))
-import Control.Category ((<<<), (>>>))
+import Control.Alternative (guard)
 import Control.Monad.RWS (ask)
 import Control.Monad.Reader (class MonadAsk)
 import Data.Foldable (class Foldable, foldr)
-import Data.Function (($))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe
-  ( Maybe(Just, Nothing)
-  , fromMaybe
-  , isJust
-  )
+import Data.Maybe (Maybe(Just, Nothing), fromMaybe, isJust)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.UInt (UInt)
-import Data.Unit (Unit)
-import Effect.Class
-  ( class MonadEffect
-  , liftEffect
-  )
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import Types.Transaction (TransactionHash)
