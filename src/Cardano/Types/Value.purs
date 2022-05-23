@@ -396,7 +396,7 @@ mkSingletonValue' curSymbol tokenName amount = do
 --------------------------------------------------------------------------------
 -- https://playground.plutus.iohkdev.io/doc/haddock/plutus-tx/html/src/PlutusTx.AssocMap.html#union
 -- | Combine two `Map`s.
-union :: ∀ k v r. Ord k => Map k v -> Map k r -> Map k (These v r)
+union :: forall k v r. Ord k => Map k v -> Map k r -> Map k (These v r)
 union l r =
   let
     ls :: Array (k /\ v)

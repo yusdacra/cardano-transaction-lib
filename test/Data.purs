@@ -457,7 +457,7 @@ testBinaryFixture value binaryFixture = do
         (hexToByteArrayUnsafe binaryFixture)
 
 -- | Poor man's type level tests
-tests ∷ Array String
+tests :: Array String
 tests =
   [ testNil
   , testSingleton
@@ -480,7 +480,7 @@ tests =
     => String
   testUniques = "[A, B, C] is all unique and should compile"
 
-uniqueIndicesTests ∷ Array String
+uniqueIndicesTests :: Array String
 uniqueIndicesTests =
   [ testNil
   , testSingletonZ
