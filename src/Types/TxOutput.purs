@@ -1,4 +1,4 @@
-module TxOutput
+module Types.TxOutput
   ( datumHashToOgmiosDatumHash
   , ogmiosDatumHashToDatumHash
   , ogmiosTxOutToScriptOutput
@@ -14,7 +14,7 @@ module TxOutput
 
 import Prelude
 
-import Address
+import Cardano.Address
   ( addressToOgmiosAddress
   , enterpriseAddressValidatorHash
   , ogmiosAddressToAddress
@@ -26,7 +26,7 @@ import Cardano.Types.Transaction
 import Data.Map (Map)
 import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Newtype (unwrap, wrap)
-import Scripts (validatorHashEnterpriseAddress)
+import Plutus.Scripts (validatorHashEnterpriseAddress)
 import Serialization.Address (NetworkId)
 import Types.ByteArray (byteArrayToHex, hexToByteArray)
 import Types.Datum (DataHash)

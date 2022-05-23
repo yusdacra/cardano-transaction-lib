@@ -1,4 +1,4 @@
-module FromData
+module Types.FromData
   ( FromDataError(..)
   , class FromData
   , class FromDataArgs
@@ -30,7 +30,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.UInt (UInt)
 import Data.Unfoldable (class Unfoldable)
-import Helpers (bigIntToUInt)
+import Utils (bigIntToUInt)
 import Prelude
 import Prim.Row as Row
 import Prim.RowList as RL

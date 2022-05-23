@@ -24,7 +24,7 @@ import Data.Either (Either(Left))
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
 import Serialization.Address
@@ -41,7 +41,7 @@ import Serialization.Address
   , rewardAddressToAddress
   )
 import Serialization.Hash (Ed25519KeyHash)
-import ToData (class ToData)
+import Types.ToData (class ToData)
 
 newtype PubKeyHash = PubKeyHash Ed25519KeyHash
 

@@ -23,12 +23,12 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import Helpers (fromRightEff)
+import Utils (fromRightEff)
 import Mote (group, test)
 import Test.Spec.Assertions (shouldEqual)
 import TestM (TestPlanM)
 import Serialization.WitnessSet as Serialization.WitnessSet
-import Transaction
+import Cardano.Transaction
   ( attachDatum
   , attachRedeemer
   , attachPlutusScript

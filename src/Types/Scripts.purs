@@ -24,11 +24,11 @@ import Data.Either (Either(Left))
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
 import Serialization.Hash (ScriptHash)
-import ToData (class ToData)
+import Types.ToData (class ToData)
 import Types.ByteArray (ByteArray)
 
 --------------------------------------------------------------------------------

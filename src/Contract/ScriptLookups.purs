@@ -19,8 +19,8 @@ import Prelude
 import Contract.Monad (Contract, wrapContract)
 import Data.Either (Either, hush)
 import Data.Maybe (Maybe)
-import FromData (class FromData)
-import ToData (class ToData)
+import Types.FromData (class FromData)
+import Types.ToData (class ToData)
 import Types.Datum (Datum)
 import Types.ScriptLookups
   ( MkUnbalancedTxError(..) -- A lot errors so will refrain from explicit names.

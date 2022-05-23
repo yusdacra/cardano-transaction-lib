@@ -86,7 +86,7 @@ import Data.Symbol (SProxy(SProxy))
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested (type (/\))
 import Data.UInt (UInt)
-import Helpers ((</>), (<<>>), appendMap)
+import Utils ((</>), (<<>>), appendMap)
 import Serialization.Address
   ( Address
   , NetworkId

@@ -1,4 +1,4 @@
-module ToData
+module Types.ToData
   ( class ToData
   , class ToDataArgs
   , class ToDataWithSchema
@@ -29,7 +29,7 @@ import Data.Symbol (class IsSymbol)
 import Data.TextEncoder (encodeUtf8)
 import Data.Tuple (Tuple(Tuple), fst, snd)
 import Data.UInt (UInt)
-import Helpers (uIntToBigInt)
+import Utils (uIntToBigInt)
 import Prim.Row as Row
 import Prim.TypeError (class Fail, Text)
 import Record as Record

@@ -6,7 +6,7 @@ module QueryM.Utxos
 
 import Prelude
 
-import Address (addressToOgmiosAddress)
+import Cardano.Address (addressToOgmiosAddress)
 import Cardano.Types.Transaction
   ( TransactionOutput
   , UtxoM(UtxoM)
@@ -24,13 +24,13 @@ import Data.Tuple.Nested (type (/\))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import Helpers as Helpers
+import Utils as Utils
 import QueryM (QueryM, getWalletCollateral, mkOgmiosRequest)
 import Serialization.Address (Address)
 import Types.Transaction (TransactionInput)
-import TxOutput (ogmiosTxOutToTransactionOutput, txOutRefToTransactionInput)
+import Types.TxOutput (ogmiosTxOutToTransactionOutput, txOutRefToTransactionInput)
 import Types.UsedTxOuts (UsedTxOuts, isTxOutRefUsed)
-import Wallet (Wallet(Nami))
+import Types.Wallet (Wallet(Nami))
 import QueryM.Ogmios as Ogmios
 
 --------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ utxosAt addr = asks _.wallet >>= maybe (allUtxosAt addr) (utxosAtByWallet addr)
 
 filterUnusedUtxos :: UtxoM -> QueryM UtxoM
 filterUnusedUtxos (UtxoM utxos) = withTxRefsCache $
-  UtxoM <$> Helpers.filterMapWithKeyM (\k _ -> isTxOutRefUsed (unwrap k)) utxos
+  UtxoM <$> Utils.filterMapWithKeyM (\k _ -> isTxOutRefUsed (unwrap k)) utxos
 
 withTxRefsCache
   :: forall (m :: Type -> Type) (a :: Type)

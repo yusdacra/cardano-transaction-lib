@@ -19,7 +19,7 @@ import Data.Traversable (for_, traverse, traverse_)
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Exception (throw)
-import FfiHelpers
+import Utils.Ffi
   ( ContainerHelper
   , MaybeFfiHelper
   , containerHelper

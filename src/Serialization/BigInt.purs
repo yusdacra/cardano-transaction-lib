@@ -4,7 +4,7 @@ module Serialization.BigInt
 
 import Prelude
 import Serialization.Types (BigInt)
-import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
+import Utils.Ffi (MaybeFfiHelper, maybeFfiHelper)
 import Data.BigInt as BigInt
 import Data.Maybe (Maybe)
 

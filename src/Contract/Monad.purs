@@ -72,7 +72,7 @@ import Effect.Aff (Aff, launchAff_) as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, throw)
-import Helpers (logWithLevel)
+import Utils (logWithLevel)
 import QueryM (QueryM, QueryMExtended, QueryConfig)
 import QueryM
   ( DatumCacheListeners
@@ -98,7 +98,7 @@ import Serialization.Address (NetworkId(TestnetId))
 import Types.Interval (SlotConfig)
 import Types.Interval (defaultSlotConfig) as Interval
 import Types.UsedTxOuts (newUsedTxOuts)
-import Wallet (Wallet, mkNamiWalletAff)
+import Types.Wallet (Wallet, mkNamiWalletAff)
 
 -- | The `Contract` monad is a newtype wrapper over `QueryM` which is `ReaderT`
 -- | on `QueryConfig` over asynchronous effects, `Aff`. Throwing and catching

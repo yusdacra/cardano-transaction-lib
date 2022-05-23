@@ -1,4 +1,4 @@
-module Metadata.Helpers
+module Metadata.Utils
   ( mkKey
   , unsafeMkKey
   , lookupKey

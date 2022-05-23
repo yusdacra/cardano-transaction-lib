@@ -78,7 +78,7 @@ import Data.Show.Generic (genericShow)
 import Data.These (These(Both, That, This))
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple.Nested ((/\), type (/\))
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
 import Partial.Unsafe (unsafePartial)
@@ -88,7 +88,7 @@ import Serialization.Hash
   , scriptHashFromBytes
   , scriptHashToBytes
   )
-import ToData (class ToData)
+import Types.ToData (class ToData)
 import Types.ByteArray (ByteArray, hexToByteArray, byteArrayToHex)
 import Types.CborBytes (byteLength)
 import Types.Scripts (MintingPolicyHash(MintingPolicyHash))

@@ -5,13 +5,13 @@ module Test.Metadata.Seabug
 import Prelude
 
 import Data.Maybe (Maybe(Just))
-import FromData (fromData)
+import Types.FromData (fromData)
 import Metadata.MetadataType (fromGeneralTxMetadata, toGeneralTxMetadata)
 import Mote (group, test)
 import Test.Fixtures (seabugMetadataFixture1, seabugMetadataDeltaFixture1)
 import Test.Spec.Assertions (shouldEqual)
 import TestM (TestPlanM)
-import ToData (toData)
+import Types.ToData (toData)
 
 suite :: TestPlanM Unit
 suite = do

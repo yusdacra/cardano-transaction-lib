@@ -56,13 +56,13 @@ import Data.UInt (UInt)
 import Data.UInt as UInt
 import Deserialization.FromBytes (fromBytes, fromBytesEffect)
 import Effect (Effect)
-import FfiHelpers
+import Utils.Ffi
   ( MaybeFfiHelper
   , maybeFfiHelper
   , ContainerHelper
   , containerHelper
   )
-import Helpers (fromJustEff)
+import Utils (fromJustEff)
 import Serialization.Address (Address, StakeCredential, RewardAddress)
 import Serialization.Address (NetworkId(TestnetId, MainnetId)) as T
 import Serialization.AuxiliaryData (convertAuxiliaryData, setTxAuxiliaryData)

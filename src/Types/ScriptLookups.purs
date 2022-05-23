@@ -22,7 +22,7 @@ module Types.ScriptLookups
 
 import Prelude hiding (join)
 
-import Address (enterpriseAddressValidatorHash)
+import Cardano.Address (enterpriseAddressValidatorHash)
 import Cardano.Types.Transaction (Redeemer(Redeemer)) as T
 import Cardano.Types.Transaction
   ( ExUnits
@@ -79,11 +79,11 @@ import Data.Symbol (SProxy(SProxy))
 import Data.Traversable (for, sequence, traverse)
 import Data.Tuple (fst)
 import Data.Tuple.Nested (type (/\), (/\))
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Helpers ((<\>), liftEither, liftM)
+import Utils ((<\>), liftEither, liftM)
 import Plutus.FromPlutusType (fromPlutusType)
 import Plutus.Types.Transaction (TransactionOutput) as Plutus
 import QueryM
@@ -92,14 +92,14 @@ import QueryM
   , datumHash
   , getDatumByHash
   )
-import Scripts
+import Plutus.Scripts
   ( mintingPolicyHash
   , validatorHash
   , validatorHashEnterpriseAddress
   )
 import Serialization.Address (Address, NetworkId)
-import ToData (class ToData)
-import Transaction
+import Types.ToData (class ToData)
+import Cardano.Transaction
   ( ModifyTxError
   , attachDatum
   , attachPlutusScript
@@ -167,7 +167,7 @@ import Types.UnbalancedTransaction
   -- , payPubKeyHash
   , payPubKeyRequiredSigner
   )
-import TxOutput (transactionOutputToScriptOutput)
+import Types.TxOutput (transactionOutputToScriptOutput)
 
 -- Taken mainly from https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger-constraints/html/Ledger-Constraints-OffChain.html
 -- Plutus rev: cc72a56eafb02333c96f662581b57504f8f8992f via Plutus-apps (localhost): abe4785a4fc4a10ba0c4e6417f0ab9f1b4169b26

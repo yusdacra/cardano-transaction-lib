@@ -2,7 +2,7 @@ module Test.AffInterface (suite) where
 
 import Prelude
 
-import Address (addressToOgmiosAddress, ogmiosAddressToAddress)
+import Cardano.Address (addressToOgmiosAddress, ogmiosAddressToAddress)
 import Contract.Address (Slot(Slot))
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.UInt as UInt

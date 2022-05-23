@@ -314,7 +314,7 @@ import Effect.Class (liftEffect) as Effect
 import Effect.Class.Console (log) as Console
 import Effect.Aff (Aff) as Aff
 import Effect.Aff.Class (liftAff) as Aff
-import Helpers -- Could maybe move this somewhere better:
+import Utils -- Could maybe move this somewhere better:
   ( (</>)
   , (<<>>)
   , (<\>)

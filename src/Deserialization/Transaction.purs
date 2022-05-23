@@ -118,8 +118,8 @@ import Deserialization.WitnessSet
   , convertPlutusScripts
   , convertWitnessSet
   )
-import Error (E, notImplementedError)
-import FfiHelpers
+import Types.Error (E, notImplementedError)
+import Utils.Ffi
   ( ContainerHelper
   , ErrorFfiHelper
   , MaybeFfiHelper

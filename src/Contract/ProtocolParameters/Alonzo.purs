@@ -1,6 +1,6 @@
 module Contract.ProtocolParameters.Alonzo (module Alonzo) where
 
-import ProtocolParametersAlonzo
+import Utils.ProtocolParametersAlonzo
   ( adaOnlyWords
   , coinSize
   , lovelacePerUTxOWord

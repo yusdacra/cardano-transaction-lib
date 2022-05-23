@@ -9,10 +9,10 @@ import Prelude
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Maybe (Maybe(Just, Nothing))
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata, toMetadata)
-import ToData (class ToData)
+import Types.ToData (class ToData)
 import Types.Int (toBigInt) as Int
 import Types.PlutusData (PlutusData(Integer))
 import Types.TransactionMetadata (TransactionMetadatum(Int)) as Metadata

@@ -11,7 +11,7 @@ import Data.BigInt (BigInt, fromString)
 import Data.Int as Int
 import Data.Maybe (Maybe)
 import Deserialization.Error (FromCslRepError, fromCslRepError)
-import Error (E, noteE)
+import Types.Error (E, noteE)
 import Serialization.Types (BigNum)
 import Type.Row (type (+))
 

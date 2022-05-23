@@ -11,8 +11,8 @@ import Types.Scripts (ValidatorHash)
 import Types.PlutusData (PlutusData(Constr))
 import Types.PubKeyHash (PubKeyHash)
 import Serialization.Address (Pointer)
-import ToData (class ToData, toData)
-import FromData (class FromData, fromData)
+import Types.ToData (class ToData, toData)
+import Types.FromData (class FromData, fromData)
 
 --------------------------------------------------------------------------------
 -- Credential

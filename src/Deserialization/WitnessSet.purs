@@ -24,7 +24,7 @@ import Data.Maybe (Maybe(Just, Nothing))
 import Data.Traversable (for, traverse)
 import Data.Tuple.Nested ((/\))
 import Deserialization.BigNum (bigNumToBigInt)
-import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
+import Utils.Ffi (MaybeFfiHelper, maybeFfiHelper)
 import Serialization.Types
   ( BigNum
   , BootstrapWitness

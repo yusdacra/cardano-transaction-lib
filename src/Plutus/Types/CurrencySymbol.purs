@@ -21,14 +21,14 @@ import Aeson
   )
 import Data.Either (Either(Left))
 import Data.Maybe (Maybe)
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Serialization.Hash
   ( ScriptHash
   , scriptHashAsBytes
   , scriptHashFromBytes
   , scriptHashToBytes
   )
-import ToData (class ToData)
+import Types.ToData (class ToData)
 import Types.ByteArray (ByteArray)
 import Data.Newtype (unwrap, wrap)
 import Types.Scripts (MintingPolicyHash(MintingPolicyHash))

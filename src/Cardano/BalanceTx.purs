@@ -1,4 +1,4 @@
-module BalanceTx
+module Cardano.BalanceTx
   ( Actual(..)
   , AddTxCollateralsError(..)
   , BalanceNonAdaOutsError(..)
@@ -79,7 +79,7 @@ import Data.Traversable (traverse_)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\), type (/\))
 import Effect.Class (class MonadEffect)
-import ProtocolParametersAlonzo
+import Utils.ProtocolParametersAlonzo
   ( adaOnlyWords
   , coinSize
   , lovelacePerUTxOWord
@@ -97,7 +97,7 @@ import QueryM
   , evalTxExecutionUnits
   )
 import QueryM.Utxos (utxosAt)
-import ReindexRedeemers (ReindexErrors, reindexSpentScriptRedeemers)
+import Cardano.ReindexRedeemers (ReindexErrors, reindexSpentScriptRedeemers)
 import Serialization.Address
   ( Address
   , addressPaymentCred
@@ -110,7 +110,7 @@ import Types.UnbalancedTransaction
   ( UnbalancedTx(UnbalancedTx)
   , _transaction
   )
-import TxOutput (utxoIndexToUtxo)
+import Types.TxOutput (utxoIndexToUtxo)
 
 -- This module replicates functionality from
 -- https://github.com/mlabs-haskell/bot-plutus-interface/blob/master/src/BotPlutusInterface/PreBalance.hs

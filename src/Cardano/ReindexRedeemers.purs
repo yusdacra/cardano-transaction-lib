@@ -1,6 +1,6 @@
 -- | This module implements functionality to reindex redeemers to be used after
 -- | balancing when all inputs have been inserted to the array.
-module ReindexRedeemers
+module Cardano.ReindexRedeemers
   ( ReindexErrors(..)
   , reindexSpentScriptRedeemers
   ) where
@@ -17,7 +17,7 @@ import Data.Maybe (Maybe(Just))
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Data.Tuple.Nested (type (/\), (/\))
-import Helpers (liftEither)
+import Utils (liftEither)
 import QueryM (QueryM)
 import Types.RedeemerTag (RedeemerTag(Spend))
 import Types.Transaction (TransactionInput)

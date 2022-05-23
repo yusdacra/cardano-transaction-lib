@@ -30,7 +30,7 @@ module Contract.Address
 
 import Prelude
 
-import Address
+import Cardano.Address
   ( enterpriseAddressScriptHash
   , enterpriseAddressStakeValidatorHash
   , enterpriseAddressValidatorHash
@@ -61,7 +61,7 @@ import QueryM
   , ownPubKeyHash
   , ownStakePubKeyHash
   ) as QueryM
-import Scripts
+import Plutus.Scripts
   ( typedValidatorBaseAddress
   , typedValidatorEnterpriseAddress
   , validatorHashBaseAddress

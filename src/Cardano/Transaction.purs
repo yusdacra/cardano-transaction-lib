@@ -1,4 +1,4 @@
-module Transaction
+module Cardano.Transaction
   ( ModifyTxError(..)
   , attachDatum
   , attachRedeemer
@@ -24,8 +24,8 @@ import Data.Show.Generic (genericShow)
 import Deserialization.WitnessSet as Deserialization.WitnessSet
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Helpers (liftEither)
-import ProtocolParametersAlonzo (costModels)
+import Utils (liftEither)
+import Utils.ProtocolParametersAlonzo (costModels)
 import Serialization (hashScriptData, toBytes)
 import Serialization.PlutusData as Serialization.PlutusData
 import Serialization.Types as Serialization

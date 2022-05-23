@@ -39,9 +39,9 @@ import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Foreign.Object (Object, toUnfoldable) as FO
 import Plutus.Types.AssocMap (Map(Map), singleton) as AssocMap
-import FromData (class FromData, fromData)
-import ToData (class ToData, toData)
-import Metadata.Helpers (lookupKey, lookupMetadata)
+import Types.FromData (class FromData, fromData)
+import Types.ToData (class ToData, toData)
+import Metadata.Utils (lookupKey, lookupMetadata)
 import Metadata.FromMetadata (class FromMetadata, fromMetadata)
 import Metadata.ToMetadata (class ToMetadata, toMetadata, anyToMetadata)
 import Metadata.MetadataType (class MetadataType)

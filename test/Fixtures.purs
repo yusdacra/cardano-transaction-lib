@@ -139,7 +139,7 @@ import Metadata.Cip25
 import Node.FS.Sync (readTextFile)
 import Node.Encoding (Encoding(UTF8))
 import Partial.Unsafe (unsafePartial)
-import ProtocolParametersAlonzo (costModels)
+import Utils.ProtocolParametersAlonzo (costModels)
 import Serialization.Address
   ( Address
   , NetworkId(MainnetId, TestnetId)

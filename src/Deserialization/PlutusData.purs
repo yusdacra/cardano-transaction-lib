@@ -11,7 +11,7 @@ import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested (type (/\), (/\))
 import Deserialization.BigInt (convertBigInt)
 import Deserialization.BigNum (bigNumToBigInt)
-import FfiHelpers
+import Utils.Ffi
   ( ContainerHelper
   , MaybeFfiHelper
   , containerHelper

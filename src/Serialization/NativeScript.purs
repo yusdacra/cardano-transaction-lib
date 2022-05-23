@@ -19,7 +19,7 @@ import Cardano.Types.Transaction
       , TimelockExpiry
       )
   ) as T
-import FfiHelpers (ContainerHelper, containerHelper)
+import Utils.Ffi (ContainerHelper, containerHelper)
 import Serialization.Address (Slot(Slot)) as T
 import Serialization.Hash (Ed25519KeyHash) as T
 import Serialization.Types

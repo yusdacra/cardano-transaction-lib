@@ -1,4 +1,4 @@
-module Wallet
+module Types.Wallet
   ( NamiConnection
   , NamiWallet
   , Wallet(..)
@@ -30,8 +30,8 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
 import Effect.Ref as Ref
-import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
-import Helpers ((<<>>))
+import Utils.Ffi (MaybeFfiHelper, maybeFfiHelper)
+import Utils ((<<>>))
 import Serialization as Serialization
 import Serialization.Address (Address, addressFromBytes)
 import Types.ByteArray (byteArrayToHex)

@@ -1,5 +1,5 @@
 -- | A module with helpers for converting between different Numeric types
 -- | outside of CTL's custom types.
-module Contract.Numeric.Convert (module Helpers) where
+module Contract.Numeric.Convert (module Utils) where
 
-import Helpers (bigIntToUInt, uIntToBigInt) as Helpers
+import Utils (bigIntToUInt, uIntToBigInt) as Utils

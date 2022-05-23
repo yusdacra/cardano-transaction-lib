@@ -1,4 +1,4 @@
-module JsWebSocket
+module Types.JsWebSocket
   ( JsWebSocket
   , Url
   , _mkWebSocket

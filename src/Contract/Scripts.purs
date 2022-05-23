@@ -38,8 +38,8 @@ import QueryM
       )
   ) as ExportQueryM
 import QueryM (applyArgs) as QueryM
-import Scripts (scriptHash) as ExportScripts
-import Scripts
+import Plutus.Scripts (scriptHash) as ExportScripts
+import Plutus.Scripts
   ( mintingPolicyHash
   , stakeValidatorHash
   , validatorHash

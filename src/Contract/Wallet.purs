@@ -7,7 +7,7 @@ module Contract.Wallet
 
 import Contract.Monad (Contract)
 import Effect.Aff.Class (liftAff)
-import Wallet
+import Types.Wallet
   ( NamiConnection
   , NamiWallet
   , Wallet(Nami)

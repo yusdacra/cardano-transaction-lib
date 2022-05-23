@@ -14,7 +14,7 @@ import Prelude
 
 import Data.UInt (UInt)
 import Data.UInt as UInt
-import JsWebSocket (Url)
+import Types.JsWebSocket (Url)
 
 type Host = String
 

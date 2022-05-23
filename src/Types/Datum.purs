@@ -10,8 +10,8 @@ import Aeson (class DecodeAeson)
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import FromData (class FromData)
-import ToData (class ToData, toData)
+import Types.FromData (class FromData)
+import Types.ToData (class ToData, toData)
 import Types.PlutusData (PlutusData)
 import Types.Transaction (DataHash(DataHash)) as X
 

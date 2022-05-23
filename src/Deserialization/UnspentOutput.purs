@@ -30,7 +30,7 @@ import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested (type (/\))
 import Data.UInt as UInt
 import Deserialization.BigNum (bigNumToBigInt)
-import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
+import Utils.Ffi (MaybeFfiHelper, maybeFfiHelper)
 import Serialization (toBytes)
 import Serialization.Address (Address)
 import Serialization.Hash (ScriptHash, scriptHashToBytes)

@@ -9,7 +9,7 @@ module Contract.Value
 import Prelude
 import Contract.Monad (Contract, wrapContract)
 import Data.Maybe (Maybe)
-import Scripts (scriptCurrencySymbol) as Scripts
+import Plutus.Scripts (scriptCurrencySymbol) as Scripts
 import Types.Scripts (MintingPolicy)
 import Types.TokenName
   ( TokenName

@@ -1,4 +1,4 @@
-module ProtocolParametersAlonzo
+module Utils.ProtocolParametersAlonzo
   ( adaOnlyWords
   , coinSize
   , costModels

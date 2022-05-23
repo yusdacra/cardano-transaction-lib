@@ -29,11 +29,11 @@ import Data.Maybe (Maybe(Nothing))
 import Data.Newtype (wrap)
 import Data.Traversable (class Traversable, traverse)
 import Data.Tuple.Nested (type (/\))
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
 import Serialization.Types (AssetName) as CSL
-import ToData (class ToData)
+import Types.ToData (class ToData)
 import Types.ByteArray (ByteArray, byteLength, hexToByteArray)
 import Types.CborBytes (CborBytes, cborBytesToHex)
 

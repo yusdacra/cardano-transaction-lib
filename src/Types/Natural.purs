@@ -22,10 +22,10 @@ import Data.BigInt as BigInt
 import Data.Either (Either(Left), note)
 import Data.Function (on)
 import Data.Maybe (Maybe(Nothing, Just), fromMaybe)
-import FromData (class FromData)
+import Types.FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
-import ToData (class ToData, toData)
+import Types.ToData (class ToData, toData)
 import Types.PlutusData (PlutusData(Integer))
 
 newtype Natural = Natural BigInt

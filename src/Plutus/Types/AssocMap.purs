@@ -47,8 +47,8 @@ import Data.These (These(Both, That, This), these)
 import Data.Traversable (class Traversable, for, sequence, traverse)
 import Data.Tuple (Tuple(Tuple), fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
-import FromData (class FromData, fromData)
-import ToData (class ToData, toData)
+import Types.FromData (class FromData, fromData)
+import Types.ToData (class ToData, toData)
 import Types.PlutusData (PlutusData(Map)) as PD
 
 -- Taken from local Hoogle server for the Haskell server which uses

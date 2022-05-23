@@ -25,9 +25,9 @@ module Contract.Transaction
 
 import Prelude
 
-import BalanceTx (UnattachedTransaction)
-import BalanceTx (balanceTx) as BalanceTx
-import BalanceTx (BalanceTxError) as BalanceTxError
+import Cardano.BalanceTx (UnattachedTransaction)
+import Cardano.BalanceTx (balanceTx) as BalanceTx
+import Cardano.BalanceTx (BalanceTxError) as BalanceTxError
 import Contract.Monad (Contract, liftedE, liftedM, wrapContract)
 import Data.Either (Either, hush)
 import Data.Generic.Rep (class Generic)
@@ -49,8 +49,8 @@ import QueryM
   , finalizeTx
   , submitTxOgmios
   ) as QueryM
-import ReindexRedeemers (reindexSpentScriptRedeemers) as ReindexRedeemers
-import ReindexRedeemers
+import Cardano.ReindexRedeemers (reindexSpentScriptRedeemers) as ReindexRedeemers
+import Cardano.ReindexRedeemers
   ( ReindexErrors(CannotGetTxOutRefIndexForRedeemer)
   ) as ReindexRedeemersExport
 import Types.CborBytes (CborBytes)
@@ -141,7 +141,7 @@ import Plutus.Types.Transaction
   ) as PTransaction
 import Plutus.Types.Value (Coin)
 import Serialization.Address (NetworkId)
-import TxOutput (scriptOutputToTransactionOutput) as TxOutput
+import Types.TxOutput (scriptOutputToTransactionOutput) as TxOutput
 import Types.Transaction (TransactionHash)
 import Types.Transaction
   ( DataHash(DataHash)

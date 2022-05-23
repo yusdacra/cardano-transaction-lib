@@ -1,4 +1,4 @@
-module Address
+module Cardano.Address
   ( addressToOgmiosAddress
   , enterpriseAddressMintingPolicyHash
   , enterpriseAddressScriptHash

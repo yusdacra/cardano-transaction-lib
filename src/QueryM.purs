@@ -101,8 +101,8 @@ import Effect.Exception (Error, error, throw)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import Foreign.Object as Object
-import Helpers (logString, logWithLevel)
-import JsWebSocket
+import Utils (logString, logWithLevel)
+import Types.JsWebSocket
   ( JsWebSocket
   , Url
   , _mkWebSocket
@@ -170,7 +170,7 @@ import Types.Scripts (PlutusScript)
 import Types.Transaction (TransactionHash)
 import Types.UsedTxOuts (newUsedTxOuts, UsedTxOuts)
 import Untagged.Union (asOneOf)
-import Wallet (Wallet(Nami), NamiWallet, NamiConnection)
+import Types.Wallet (Wallet(Nami), NamiWallet, NamiConnection)
 
 -- This module defines an Aff interface for Ogmios Websocket Queries
 -- Since WebSockets do not define a mechanism for linking request/response

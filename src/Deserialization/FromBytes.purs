@@ -15,8 +15,8 @@ import Data.Maybe (Maybe(Just, Nothing))
 import Data.Variant (inj)
 import Effect (Effect)
 import Effect.Exception (throw)
-import Error (E)
-import FfiHelpers (ErrorFfiHelper, errorHelper)
+import Types.Error (E)
+import Utils.Ffi (ErrorFfiHelper, errorHelper)
 import Serialization.Types
   ( DataHash
   , Mint

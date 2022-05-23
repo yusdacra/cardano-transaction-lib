@@ -1,4 +1,4 @@
-module FfiHelpers
+module Utils.Ffi
   ( MaybeFfiHelper
   , maybeFfiHelper
   , ContainerHelper
@@ -13,7 +13,7 @@ import Data.Either (Either(Left, Right), hush)
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Tuple (Tuple(Tuple))
 import Data.Variant (Variant)
-import Error (E)
+import Types.Error (E)
 
 type MaybeFfiHelper =
   { nothing :: forall (x :: Type). Maybe x

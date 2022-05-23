@@ -26,8 +26,8 @@ import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Newtype (class Newtype)
 import Data.Ratio ((%), numerator, denominator) as Ratio
 import Data.Ratio (Ratio)
-import FromData (class FromData)
-import ToData (class ToData)
+import Types.FromData (class FromData)
+import Types.ToData (class ToData)
 import Types.Natural (Natural)
 import Types.Natural (fromBigInt', toBigInt) as Nat
 import Types.PlutusData (PlutusData(Constr, Integer))

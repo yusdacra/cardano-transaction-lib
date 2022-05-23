@@ -10,7 +10,7 @@ import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Data.UInt as UInt
 
-import FfiHelpers
+import Utils.Ffi
   ( ContainerHelper
   , MaybeFfiHelper
   , containerHelper

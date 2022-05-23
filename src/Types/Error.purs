@@ -1,4 +1,4 @@
-module Error
+module Types.Error
   ( E
   , NotImplementedError
   , _notImplementedError

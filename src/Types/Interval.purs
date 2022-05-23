@@ -55,7 +55,7 @@ import Data.Maybe (Maybe(Just, Nothing), fromJust)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.UInt (fromString) as UInt
-import Helpers (uIntToBigInt, bigIntToUInt)
+import Utils (uIntToBigInt, bigIntToUInt)
 import Partial.Unsafe (unsafePartial)
 import Prelude
 import Serialization.Address (Slot(Slot))
@@ -68,8 +68,8 @@ import Plutus.Types.DataSchema
   , PNil
   )
 import TypeLevel.Nat (S, Z)
-import ToData (class ToData, genericToData)
-import FromData (class FromData, genericFromData)
+import Types.ToData (class ToData, genericToData)
+import Types.FromData (class FromData, genericFromData)
 
 --------------------------------------------------------------------------------
 -- Interval Type and related

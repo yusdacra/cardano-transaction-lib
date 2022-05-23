@@ -22,7 +22,7 @@ import Prelude
 import Contract.Monad (Contract, wrapContract)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
-import FromData
+import Types.FromData
   ( FromDataError
       ( ArgsWantedButGot
       , FromDataFailed
@@ -76,7 +76,7 @@ import QueryM
   , startFetchBlocks
   ) as QueryM
 import Serialization.Address (Slot)
-import ToData
+import Types.ToData
   ( class ToData
   , class ToDataArgs
   , class ToDataWithSchema

@@ -1,4 +1,4 @@
-module Scripts
+module Plutus.Scripts
   ( mintingPolicyHash
   , scriptCurrencySymbol
   , scriptHash
@@ -11,6 +11,7 @@ module Scripts
   ) where
 
 import Prelude
+
 import Data.Either (hush)
 import Data.Maybe (Maybe(Nothing), maybe)
 import Data.Newtype (class Newtype, unwrap)
