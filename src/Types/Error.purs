@@ -96,6 +96,6 @@ safe_
   -> a
 safe_ = safe >>> unwrap
 
--- | Annotates Maybe with more proper error instead of the Nothing case
-noteE :: forall v a. E v a -> Maybe a -> E v a
+-- | Annotates a `Maybe` with a specific error instead of the `Nothing` case
+noteE :: forall (v :: Row Type) (a :: Type). E v a -> Maybe a -> E v a
 noteE e = maybe e Right

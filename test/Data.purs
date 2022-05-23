@@ -435,12 +435,12 @@ instance (ToData a) => ToData (Tree a) where
 instance (FromData a) => FromData (Tree a) where
   fromData x = genericFromData x
 
-fromBytesFromData :: forall a. FromData a => String -> Maybe a
+fromBytesFromData :: forall (a :: Type). FromData a => String -> Maybe a
 fromBytesFromData binary = fromData =<< PDD.convertPlutusData =<< fromBytes
   (hexToByteArrayUnsafe binary)
 
 testBinaryFixture
-  :: forall a
+  :: forall (a :: Type)
    . Eq a
   => Show a
   => FromData a

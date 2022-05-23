@@ -90,6 +90,6 @@ foreign import _ConstrPlutusData_alternative :: ConstrPlutusData -> BigNum
 foreign import _ConstrPlutusData_data :: ConstrPlutusData -> PlutusList
 foreign import _unpackPlutusMap
   :: ContainerHelper
-  -> (forall a b. a -> b -> Tuple a b)
+  -> (forall (a :: Type) (b :: Type). a -> b -> Tuple a b)
   -> PlutusMap
   -> Array (PlutusData /\ PlutusData)

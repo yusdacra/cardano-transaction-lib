@@ -204,7 +204,7 @@ mustPayWithDatumToPubKey pkh datum =
 -- | Lock the value and datum with a payment public key hash and (optionally) a
 -- | stake public key hash.
 mustPayWithDatumToPubKeyAddress
-  :: forall i o
+  :: forall (i :: Type) (o :: Type)
    . PaymentPubKeyHash
   -> StakePubKeyHash
   -> Datum

@@ -109,7 +109,7 @@ member :: forall (k :: Type) (v :: Type). Eq k => k -> Map k v -> Boolean
 member k = isJust <<< lookup k
 
 -- Insert a key, value pair into a `Map`
-insert :: forall k v. (Eq k) => k -> v -> Map k v -> Map k v
+insert :: forall (k :: Type) (v :: Type). (Eq k) => k -> v -> Map k v -> Map k v
 insert k v m = unionWith (\_ b -> b) m $ singleton k v
 
 -- | Delete a key in a `Map`

@@ -80,7 +80,7 @@ foreign import _packPlutusList
 foreign import _mkConstrPlutusData :: BigNum -> PlutusList -> ConstrPlutusData
 foreign import _bigIntFromString :: MaybeFfiHelper -> String -> Maybe BigInt
 foreign import _packMap
-  :: (forall a b. Tuple a b -> a)
-  -> (forall a b. Tuple a b -> b)
+  :: (forall (a :: Type) (b :: Type). Tuple a b -> a)
+  -> (forall (a :: Type) (b :: Type). Tuple a b -> b)
   -> Array (PlutusData /\ PlutusData)
   -> PlutusMap

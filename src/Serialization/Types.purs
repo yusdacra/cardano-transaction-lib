@@ -174,5 +174,5 @@ instance Show VRFKeyHash where
 instance Eq VRFKeyHash where
   eq = eq `on` show
 
-foreign import _to_str :: forall a. a -> String
-foreign import _to_bech32 :: forall a. a -> String
+foreign import _to_str :: forall (a :: Type). a -> String
+foreign import _to_bech32 :: forall (a :: Type). a -> String

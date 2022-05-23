@@ -20,7 +20,8 @@ foreign import bigNumToString :: BigNum -> String
 bigNumToBigInt :: BigNum -> Maybe BigInt
 bigNumToBigInt = bigNumToString >>> fromString
 
-bigNumToBigInt' :: forall r. String -> BigNum -> E (FromCslRepError + r) BigInt
+bigNumToBigInt'
+  :: forall (r :: Row Type). String -> BigNum -> E (FromCslRepError + r) BigInt
 bigNumToBigInt' nm bn =
   noteE (fromCslRepError (nm <> ": CSL.BigNum (" <> show bn <> ") -> BigInt "))
     $ bigNumToBigInt bn
@@ -28,7 +29,8 @@ bigNumToBigInt' nm bn =
 bigNumToInt :: BigNum -> Maybe Int
 bigNumToInt = bigNumToString >>> Int.fromString
 
-bigNumToInt' :: forall r. String -> BigNum -> E (FromCslRepError + r) Int
+bigNumToInt'
+  :: forall (r :: Row Type). String -> BigNum -> E (FromCslRepError + r) Int
 bigNumToInt' nm bn =
   noteE (fromCslRepError (nm <> ": CSL.BigNum (" <> show bn <> ") -> Int ")) $
     bigNumToInt bn

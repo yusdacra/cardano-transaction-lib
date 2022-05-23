@@ -19,40 +19,39 @@ import Data.Medea (ValidationError(EmptyError))
 import Effect.Aff (Aff)
 import Mote (MoteT)
 
-type TestPlanM a = MoteT (Const Void) (Aff Unit) Aff a
+type TestPlanM (a :: Type) = MoteT (Const Void) (Aff Unit) Aff a
 
 -- this silly thing is needed because Medea's `validate` needs both
 -- MonadPlus and MonadError, there must be a better way
 -- or it should be upstreamed to medea-ps as a default
-newtype ValidationM a = ValidationM (ExceptT ValidationError Identity a)
+newtype ValidationM (a :: Type) = ValidationM
+  (ExceptT ValidationError Identity a)
 
-derive newtype instance functorValidationM :: Functor ValidationM
-derive newtype instance applyValidationM :: Apply ValidationM
-derive newtype instance applicativeValidationM :: Applicative ValidationM
-derive newtype instance bindValidationM :: Bind ValidationM
-derive newtype instance monadValidationM :: Monad ValidationM
-derive newtype instance monadThrowValidationM ::
-  MonadThrow ValidationError ValidationM
+derive newtype instance Functor ValidationM
+derive newtype instance Apply ValidationM
+derive newtype instance Applicative ValidationM
+derive newtype instance Bind ValidationM
+derive newtype instance Monad ValidationM
+derive newtype instance MonadThrow ValidationError ValidationM
 
-derive newtype instance monadErrorValidationM ::
-  MonadError ValidationError ValidationM
+derive newtype instance MonadError ValidationError ValidationM
 
 -- note: MonadZero is being deprecated
-derive newtype instance monadZeroValidationM :: MonadZero ValidationM
-derive newtype instance monadPlusValidationM :: MonadPlus ValidationM
-instance altValidationM :: Alt ValidationM where
+derive newtype instance MonadZero ValidationM
+derive newtype instance MonadPlus ValidationM
+instance Alt ValidationM where
   alt (ValidationM first) (ValidationM second) = case runExceptT first of
     (Identity (Right a)) -> pure a
     (Identity (Left _)) -> case runExceptT second of
       (Identity (Right a)) -> pure a
       (Identity (Left e)) -> throwError e
 
-instance plusValidationM :: Plus ValidationM where
+instance Plus ValidationM where
   empty = throwError EmptyError
 
-instance alternativeValidationM :: Alternative ValidationM
+instance Alternative ValidationM
 
-runValidationM :: forall a. ValidationM a -> Either ValidationError a
+runValidationM :: forall (a :: Type). ValidationM a -> Either ValidationError a
 runValidationM (ValidationM etvia) = do
   let (Identity eva) = runExceptT etvia
   eva

@@ -274,11 +274,11 @@ instance DecodeAeson Cip25Metadata where
                   assetName_ <- decodeAssetName assetName
                   metadataEntryDecodeAeson policyId_ assetName_ contents
     where
-    objToArray :: forall a. FO.Object a -> Array (Tuple String a)
+    objToArray :: forall (a :: Type). FO.Object a -> Array (Tuple String a)
     objToArray = FO.toUnfoldable
 
     withJsonObject
-      :: forall a
+      :: forall (a :: Type)
        . Aeson
       -> (FO.Object Aeson -> Either JsonDecodeError a)
       -> Either JsonDecodeError a
@@ -301,15 +301,15 @@ instance DecodeAeson Cip25Metadata where
 -- Helpers
 --------------------------------------------------------------------------------
 
-errExpectedObject :: forall a. Either JsonDecodeError a
+errExpectedObject :: forall (a :: Type). Either JsonDecodeError a
 errExpectedObject =
   Left (TypeMismatch "Expected object")
 
-errExpectedArray :: forall a. Either JsonDecodeError a
+errExpectedArray :: forall (a :: Type). Either JsonDecodeError a
 errExpectedArray =
   Left (TypeMismatch "Expected array")
 
-errExpectedNonEmptyArray :: forall a. Either JsonDecodeError a
+errExpectedNonEmptyArray :: forall (a :: Type). Either JsonDecodeError a
 errExpectedNonEmptyArray =
   Left (TypeMismatch "Expected non-empty array")
 

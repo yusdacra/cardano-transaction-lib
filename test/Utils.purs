@@ -22,7 +22,8 @@ import Test.Spec.Runner (runSpec)
 import TestM (TestPlanM)
 import Type.Proxy (Proxy)
 
-foreign import unsafeCall :: forall a b. Proxy b -> String -> a -> b
+foreign import unsafeCall
+  :: forall (a :: Type) (b :: Type). Proxy b -> String -> a -> b
 
 -- | We use `mote` here so that we can use effects to build up a test tree, which
 -- | is then interpreted here in a pure context, mainly due to some painful types

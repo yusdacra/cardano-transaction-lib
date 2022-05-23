@@ -167,7 +167,8 @@ uIntToBigInt = unsafePartial fromJust <<< BigInt.fromString <<< UInt.toString
 bigIntToUInt :: BigInt -> Maybe UInt
 bigIntToUInt = UInt.fromString <<< BigInt.toString
 
-notImplemented :: forall a. Warn (Text "Function not implemented!") => a
+notImplemented
+  :: forall (a :: Type). Warn (Text "Function not implemented!") => a
 notImplemented = undefined
 
 -- | Log a message by printing it to the console, depending on the provided

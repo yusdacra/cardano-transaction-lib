@@ -27,7 +27,7 @@ type ErrorFfiHelper r =
   , from :: forall (x :: Type). x -> E r x -> x
   }
 
-errorHelper :: forall v. (String -> Variant v) -> ErrorFfiHelper v
+errorHelper :: forall (v :: Row Type). (String -> Variant v) -> ErrorFfiHelper v
 errorHelper v =
   { error: Left <<< v, valid: Right, from: \e -> hush >>> fromMaybe e }
 
@@ -37,13 +37,13 @@ maybeFfiHelper = { nothing: Nothing, just: Just, from: fromMaybe }
 foreign import data ContainerHelper :: Type
 
 foreign import _containerHelper
-  :: { untuple :: forall a. Tuple a a -> Array a
-     , tuple :: forall a b. a -> b -> Tuple a b
+  :: { untuple :: forall (a :: Type). Tuple a a -> Array a
+     , tuple :: forall (a :: Type) (b :: Type). a -> b -> Tuple a b
      }
   -> ContainerHelper
 
 containerHelper :: ContainerHelper
 containerHelper = _containerHelper { untuple, tuple: Tuple }
 
-untuple :: forall a. Tuple a a -> Array a
+untuple :: forall (a :: Type). Tuple a a -> Array a
 untuple (Tuple a b) = [ a, b ]

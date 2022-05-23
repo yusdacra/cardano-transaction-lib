@@ -9,6 +9,7 @@ module Deserialization.Error
   ) where
 
 import Prelude
+
 import Data.Maybe (Maybe)
 import Data.Either (Either(Left))
 import Data.Variant (default, inj, onMatch)
@@ -18,10 +19,12 @@ import Type.Proxy (Proxy(Proxy))
 import Type.Row (type (+))
 
 -- | Error type returned by Deserialization modules
-type Err r a = E (FromBytesError + NotImplementedError + FromCslRepError + r) a
+type Err (r :: Row Type) (a :: Type) = E
+  (FromBytesError + NotImplementedError + FromCslRepError + r)
+  a
 
 -- | Error type for errors returned when conversion from CSL representations fails.
-type FromCslRepError r = (fromCslRepError :: String | r)
+type FromCslRepError (r :: Row Type) = (fromCslRepError :: String | r)
 
 _fromCslRepError = Proxy :: Proxy "fromCslRepError"
 
@@ -34,7 +37,7 @@ fromCslRepError = Left <<< inj _fromCslRepError
 
 -- | Annotates Maybe's Nothing as a CSL error.
 cslErr
-  :: forall a r
+  :: forall (r :: Row Type) (a :: Type)
    . String
   -> Maybe a
   -> E (FromCslRepError + r) a
@@ -42,7 +45,7 @@ cslErr = noteE <<< fromCslRepError
 
 -- TODO make it so that it detects non-exhaustiveness
 -- | Add trace string to an error.
-addErrTrace :: forall r a. String -> Err r a -> Err r a
+addErrTrace :: forall (r :: Row Type) (a :: Type). String -> Err r a -> Err r a
 addErrTrace s (Left e) =
   Left $ e #
     ( default e # onMatch
