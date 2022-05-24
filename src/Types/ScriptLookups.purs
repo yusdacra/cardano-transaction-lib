@@ -884,6 +884,7 @@ processConstraint mpsMap osMap = do
       let value = unwrap $ fromPlutusType plutusValue
       runExceptT $ _valueSpentBalancesOutputs <>= require value
     MustSpendPubKeyOutput txo -> runExceptT do
+      lift (isInputLocked txo) >>= flip when (throwError (TxOutRefLocked txo))
       txOut <- ExceptT $ lookupTxOutRef txo
       -- Recall an Ogmios datum is a `Maybe String` where `Nothing` implies a
       -- wallet address and `Just` as script address.
@@ -896,6 +897,7 @@ processConstraint mpsMap osMap = do
           _valueSpentBalancesInputs <>= provide amount
         _ -> liftEither $ throwError $ TxOutRefWrongType txo
     MustSpendScriptOutput txo red -> runExceptT do
+      lift (isInputLocked txo) >>= flip when (throwError (TxOutRefLocked txo))
       txOut <- ExceptT $ lookupTxOutRef txo
       -- Recall an Ogmios datum is a `Maybe String` where `Nothing` implies a
       -- wallet address and `Just` as script address.
