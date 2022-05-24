@@ -75,7 +75,7 @@ import Data.Map as Map
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (traverse_)
+import Data.Traversable (traverse, traverse_)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\), type (/\))
 import Effect.Class (class MonadEffect)
@@ -96,7 +96,7 @@ import QueryM
   , getWalletCollateral
   , evalTxExecutionUnits
   )
-import QueryM.Utxos (utxosAt)
+import QueryM.Utxos (utxosAt, filterUnusedUtxos)
 import ReindexRedeemers (ReindexErrors, reindexSpentScriptRedeemers)
 import Serialization.Address
   ( Address
@@ -390,7 +390,7 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
       note (GetWalletAddressError' CouldNotGetNamiWalletAddress)
     collateral <- ExceptT $ getWalletCollateral <#>
       note (GetWalletCollateralError' CouldNotGetNamiCollateral)
-    utxos <- ExceptT $ utxosAt ownAddr <#>
+    utxos <- ExceptT $ (utxosAt ownAddr >>= traverse filterUnusedUtxos) <#>
       (note (UtxosAtError' CouldNotGetUtxos) >>> map unwrap)
 
     let
