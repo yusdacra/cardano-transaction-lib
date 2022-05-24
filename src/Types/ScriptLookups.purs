@@ -54,7 +54,7 @@ import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), runExceptT)
 import Control.Monad.Logger.Trans (LoggerT)
 import Control.Monad.Reader.Class (asks)
-import Control.Monad.Reader.Trans (ReaderT, runReaderT)
+import Control.Monad.Reader.Trans (ReaderT, withReaderT)
 import Control.Monad.State.Trans (StateT, get, gets, put, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array ((:), singleton, union) as Array
@@ -168,7 +168,7 @@ import Types.UnbalancedTransaction
   , payPubKeyRequiredSigner
   )
 import TxOutput (transactionOutputToScriptOutput)
-import Types.UsedTxOuts (lockTransactionInputs', isTxOutRefUsed)
+import Types.UsedTxOuts (lockTransactionInputs, isTxOutRefUsed)
 
 -- Taken mainly from https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger-constraints/html/Ledger-Constraints-OffChain.html
 -- Plutus rev: cc72a56eafb02333c96f662581b57504f8f8992f via Plutus-apps (localhost): abe4785a4fc4a10ba0c4e6417f0ab9f1b4169b26
@@ -589,8 +589,8 @@ mkUnbalancedTx'
   -> QueryM (Either MkUnbalancedTxError UnbalancedTx)
 mkUnbalancedTx' scriptLookups txConstraints = do
   ubtx <- runConstraintsM scriptLookups txConstraints <#> map _.unbalancedTx
-  traverse_
-    ( lockTransactionInputs' _.usedTxOuts
+  withReaderT _.usedTxOuts $ traverse_
+    ( lockTransactionInputs
         <<< _.transaction
         <<< unwrap
     )
@@ -713,7 +713,7 @@ isInputLocked
    . TransactionInput
   -> ConstraintsM a Boolean
 isInputLocked txOutRef =
-  runReaderT (isTxOutRefUsed $ unwrap txOutRef) =<< asks _.usedTxOuts
+  lift $ withReaderT _.usedTxOuts (isTxOutRefUsed $ unwrap $ txOutRef)
 
 -- Note, we don't use the redeemer here, unlike Plutus because of our lack of
 -- `TxIn` datatype.

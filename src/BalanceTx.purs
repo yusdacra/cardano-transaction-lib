@@ -57,6 +57,8 @@ import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
 import Control.Monad.Logger.Class (class MonadLogger)
 import Control.Monad.Logger.Class as Logger
 import Control.Monad.Reader.Class (asks)
+import Control.Monad.Reader.Trans (withReaderT)
+import Control.Monad.Trans.Class (lift)
 import Data.Array ((\\), findIndex, modifyAt)
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
@@ -110,7 +112,7 @@ import Types.UnbalancedTransaction
   ( UnbalancedTx(UnbalancedTx)
   , _transaction
   )
-import Types.UsedTxOuts (lockTransactionInputs')
+import Types.UsedTxOuts (lockTransactionInputs)
 import TxOutput (utxoIndexToUtxo)
 
 -- This module replicates functionality from
@@ -431,7 +433,7 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
       sortedUnsignedTx = fst unattachedTx'' # _body <<< _inputs %~ Array.sort
     -- Logs final balanced tx and returns it
 
-    lockTransactionInputs' _.usedTxOuts sortedUnsignedTx
+    lift $ withReaderT _.usedTxOuts $ lockTransactionInputs sortedUnsignedTx
 
     logTx "Post-balancing Tx " allUtxos sortedUnsignedTx
     except $ Right (unattachedTx'' # _1 .~ sortedUnsignedTx)
