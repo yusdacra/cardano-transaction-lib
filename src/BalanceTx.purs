@@ -77,7 +77,7 @@ import Data.Map as Map
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (traverse, traverse_)
+import Data.Traversable (traverse_)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\), type (/\))
 import Effect.Class (class MonadEffect)
@@ -392,7 +392,7 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
       note (GetWalletAddressError' CouldNotGetNamiWalletAddress)
     collateral <- ExceptT $ getWalletCollateral <#>
       note (GetWalletCollateralError' CouldNotGetNamiCollateral)
-    utxos <- ExceptT $ (utxosAt ownAddr >>= traverse filterUnusedUtxos) <#>
+    utxos <- ExceptT $ utxosAt ownAddr <#>
       (note (UtxosAtError' CouldNotGetUtxos) >>> map unwrap)
 
     let
@@ -408,23 +408,26 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
       unbalancedCollTx :: Transaction
       unbalancedCollTx = addTxCollateral unbalancedTx' collateral
 
+    availableUtxos <- lift $ map unwrap $ filterUnusedUtxos (wrap allUtxos)
+
     -- Logging Unbalanced Tx with collateral added:
-    logTx "Unbalanced Collaterised Tx " allUtxos unbalancedCollTx
+    logTx "Unbalanced Collaterised Tx " availableUtxos unbalancedCollTx
 
     -- Prebalance collaterised tx without fees:
     ubcTx <- except $
-      prebalanceCollateral zero allUtxos ownAddr unbalancedCollTx
+      prebalanceCollateral zero availableUtxos ownAddr unbalancedCollTx
     -- Prebalance collaterised tx with fees:
     let unattachedTx' = unattachedTx # _transaction' .~ ubcTx
     _ /\ fees <- ExceptT $ evalExUnitsAndMinFee unattachedTx'
     ubcTx' <- except $
-      prebalanceCollateral (fees + feeBuffer) allUtxos ownAddr ubcTx
+      prebalanceCollateral (fees + feeBuffer) availableUtxos ownAddr ubcTx
     -- Loop to balance non-Ada assets
-    nonAdaBalancedCollTx <- ExceptT $ loop allUtxos ownAddr [] $ unattachedTx' #
-      _transaction' .~ ubcTx'
+    nonAdaBalancedCollTx <- ExceptT $ loop availableUtxos ownAddr [] $
+      unattachedTx' #
+        _transaction' .~ ubcTx'
     -- Return excess Ada change to wallet:
     unsignedTx <- ExceptT $
-      returnAdaChange ownAddr allUtxos nonAdaBalancedCollTx <#>
+      returnAdaChange ownAddr availableUtxos nonAdaBalancedCollTx <#>
         lmap ReturnAdaChangeError'
     let
       unattachedTx'' = unsignedTx ^. _transaction'
@@ -435,7 +438,7 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
 
     lift $ withReaderT _.usedTxOuts $ lockTransactionInputs sortedUnsignedTx
 
-    logTx "Post-balancing Tx " allUtxos sortedUnsignedTx
+    logTx "Post-balancing Tx " availableUtxos sortedUnsignedTx
     except $ Right (unattachedTx'' # _1 .~ sortedUnsignedTx)
   where
   prebalanceCollateral
