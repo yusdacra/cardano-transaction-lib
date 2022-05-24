@@ -7,7 +7,7 @@ module Types.UsedTxOuts
   ( UsedTxOuts(UsedTxOuts)
   , TxOutRefCache
   , isTxOutRefUsed
-  , isTxOutRefUsed'    
+  , isTxOutRefUsed'
   , lockTransactionInputs
   , lockTransactionInputs'
   , newUsedTxOuts
@@ -58,12 +58,10 @@ newUsedTxOuts
   => m UsedTxOuts
 newUsedTxOuts = UsedTxOuts <$> liftEffect (Ref.new Map.empty)
 
-
-  
 -- | Mark transaction's inputs as used.
 lockTransactionInputs'
   :: forall (m :: Type -> Type)
-     (r :: Type)
+       (r :: Type)
    . MonadAsk r m
   => MonadEffect m
   => (r -> UsedTxOuts)
@@ -82,7 +80,6 @@ lockTransactionInputs' f tx =
   in
     asks f >>= (unwrap >>> Ref.modify_ updateCache >>> liftEffect)
 
-
 lockTransactionInputs
   :: forall (m :: Type -> Type)
    . MonadAsk UsedTxOuts m
@@ -90,7 +87,6 @@ lockTransactionInputs
   => Transaction
   -> m Unit
 lockTransactionInputs = lockTransactionInputs' identity
-
 
 -- | Remove transaction's inputs used marks.
 unlockTransactionInputs
@@ -125,8 +121,6 @@ unlockTxOutRefs txOutRefs' =
   in
     ask >>= (unwrap >>> Ref.modify_ updateCache >>> liftEffect)
 
-
-
 -- | Query if TransactionInput is marked as used.
 isTxOutRefUsed'
   :: forall (m :: Type -> Type) (r :: Type)
@@ -141,7 +135,6 @@ isTxOutRefUsed' f { transactionId, index } = do
     indices <- Map.lookup transactionId cache
     guard $ Set.member index indices
 
-
 -- | Query if TransactionInput is marked as used.
 isTxOutRefUsed
   :: forall (m :: Type -> Type) (a :: Type)
@@ -150,7 +143,6 @@ isTxOutRefUsed
   => { transactionId :: TransactionHash, index :: UInt }
   -> m Boolean
 isTxOutRefUsed = isTxOutRefUsed' identity
-
 
 txOutRefs
   :: Transaction -> Array { transactionId :: TransactionHash, index :: UInt }

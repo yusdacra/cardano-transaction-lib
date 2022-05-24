@@ -54,7 +54,7 @@ import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), runExceptT)
 import Control.Monad.Logger.Trans (LoggerT)
 import Control.Monad.Reader.Class (asks)
-import Control.Monad.Reader.Trans (ReaderT)
+import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Monad.State.Trans (StateT, get, gets, put, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array ((:), singleton, union) as Array
@@ -168,7 +168,7 @@ import Types.UnbalancedTransaction
   , payPubKeyRequiredSigner
   )
 import TxOutput (transactionOutputToScriptOutput)
-import Types.UsedTxOuts (lockTransactionInputs', isTxOutRefUsed')
+import Types.UsedTxOuts (lockTransactionInputs', isTxOutRefUsed)
 
 -- Taken mainly from https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger-constraints/html/Ledger-Constraints-OffChain.html
 -- Plutus rev: cc72a56eafb02333c96f662581b57504f8f8992f via Plutus-apps (localhost): abe4785a4fc4a10ba0c4e6417f0ab9f1b4169b26
@@ -589,9 +589,12 @@ mkUnbalancedTx'
   -> QueryM (Either MkUnbalancedTxError UnbalancedTx)
 mkUnbalancedTx' scriptLookups txConstraints = do
   ubtx <- runConstraintsM scriptLookups txConstraints <#> map _.unbalancedTx
-  traverse_ (lockTransactionInputs' (\c -> c.usedTxOuts)
-             <<< _.transaction
-             <<< unwrap) ubtx
+  traverse_
+    ( lockTransactionInputs' _.usedTxOuts
+        <<< _.transaction
+        <<< unwrap
+    )
+    ubtx
   pure ubtx
 
 -- | A newtype for the unbalanced transaction after creating one with datums
@@ -705,6 +708,13 @@ updateUtxoIndex = runExceptT do
   -- Left bias towards original map, hence `flip`:
   _unbalancedTx <<< _utxoIndex %= flip union txOutsMap
 
+isInputLocked
+  :: forall (a :: Type)
+   . TransactionInput
+  -> ConstraintsM a Boolean
+isInputLocked txOutRef =
+  runReaderT (isTxOutRefUsed $ unwrap txOutRef) =<< asks _.usedTxOuts
+
 -- Note, we don't use the redeemer here, unlike Plutus because of our lack of
 -- `TxIn` datatype.
 -- | Add a typed input, checking the type of the output it spends. Return the value
@@ -723,9 +733,9 @@ addOwnInput (InputConstraint { txOutRef }) = do
 
     ScriptLookups { txOutputs, typedValidator } <- use _lookups
 
-    used <- lift $ isTxOutRefUsed' _.usedTxOuts (unwrap txOutRef)
-    when used (throwError (TxOutRefLocked txOutRef))
-    
+    lift (isInputLocked txOutRef) >>= flip when
+      (throwError (TxOutRefLocked txOutRef))
+
     -- Convert to Cardano type
     cTxOutputs <- liftM CannotConvertFromPlutusType
       (traverse fromPlutusType txOutputs)
@@ -739,7 +749,7 @@ addOwnInput (InputConstraint { txOutRef }) = do
     let value = typedTxOutRefValue typedTxOutRef
     -- Must be inserted in order. Hopefully this matches the order under CSL
     _cpsToTxBody <<< _inputs %= insert txOutRef
-    _valueSpentBalancesInputs <>= provide value  
+    _valueSpentBalancesInputs <>= provide value
 
 -- | Add a typed output and return its value.
 addOwnOutput
@@ -837,8 +847,9 @@ lookupValidator vh osMap = do
   maybe err (pure <<< Right) $ lookup vh osMap
 
 -- | Modify the `UnbalancedTx` so that it satisfies the constraints, if
--- | possible. Fails if a hash is missing from the lookups, or if an output
--- | of the wrong type is spent.
+-- | possible. Fails if a hash is missing from the lookups, if an output
+-- | of the wrong type is spent, or if an output is spent that is already
+-- | locked by another transaction.
 processConstraint
   :: forall (a :: Type)
    . Map MintingPolicyHash MintingPolicy
