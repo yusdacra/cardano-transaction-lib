@@ -131,9 +131,7 @@ instance EncodeAeson StakingCredential where
   encodeAeson' x = pure $
     ( defer \_ -> case _ of
         StakingHash a -> E.encodeTagged "StakingHash" a E.value
-        StakingPtr ptr -> E.encodeTagged "StakingPtr"
-          (ptr.slot /\ ptr.txIx /\ ptr.certIx)
-          (E.tuple (E.value >/\< E.value >/\< E.value))
+        StakingPtr ptr -> E.encodeTagged "StakingPtr" ptr E.value
     ) x
 
 instance DecodeAeson StakingCredential where
@@ -141,8 +139,5 @@ instance DecodeAeson StakingCredential where
     $ D.sumType "StakingCredential"
     $ Map.fromFoldable
         [ "StakingHash" /\ D.content (StakingHash <$> D.value)
-        , "StakingPtr" /\ D.content
-            (D.tuple $ toStakingPtr </$\> D.value </*\> D.value </*\> D.value)
+        , "StakingPtr" /\ D.content (StakingPtr <$> D.value)
         ]
-    where
-    toStakingPtr slot txIx certIx = StakingPtr { slot, txIx, certIx }
