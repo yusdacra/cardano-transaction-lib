@@ -279,8 +279,9 @@ evalExUnitsAndMinFee'
        (Either EvalExUnitsAndMinFeeError (UnattachedUnbalancedTx /\ BigInt))
 evalExUnitsAndMinFee' unattachedTx =
   runExceptT do
+    let sortedUnattachedTx = unattachedTx # _body' <<< _inputs %~ Array.sort
     -- Reindex `Spent` script redeemers:
-    unattachedReindexedTx <- ExceptT $ reindexRedeemers unattachedTx
+    unattachedReindexedTx <- ExceptT $ reindexRedeemers sortedUnattachedTx
       <#> lmap ReindexRedeemersError
     -- Reattach datums and redeemers before evaluating ex units:
     let attachedTx = reattachDatumsAndRedeemers unattachedReindexedTx
