@@ -318,6 +318,7 @@
                   datumCache.blockFetcher.filter;
                 configFile = ''
                   dbConnectionString = "${datumCache.dbConnectionString}"
+                  server.controlApiToken = ""
                   server.port = ${toString datumCache.port}
                   ogmios.address = "ogmios"
                   ogmios.port = ${toString ogmios.port}
