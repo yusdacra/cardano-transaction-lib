@@ -5,6 +5,7 @@ module Cardano.Types.Transaction
   , Certificate(..)
   , CostModel(..)
   , Costmdls(..)
+  , DataOption(..)
   , Ed25519Signature(..)
   , Epoch(..)
   , ExUnitPrices
@@ -98,6 +99,7 @@ import Serialization.Hash (Ed25519KeyHash)
 import Serialization.Types (BigNum, VRFKeyHash)
 import Types.Aliases (Bech32String)
 import Types.ByteArray (ByteArray)
+import Types.Datum (Datum)
 import Types.Int as Int
 import Types.PlutusData (PlutusData)
 import Types.RedeemerTag (RedeemerTag)
@@ -744,10 +746,18 @@ derive instance Generic NativeScript _
 instance Show NativeScript where
   show x = genericShow x
 
+data DataOption = DataHash DataHash | Data Datum
+
+derive instance Eq DataOption
+derive instance Generic DataOption _
+
+instance Show DataOption where
+  show = genericShow
+
 newtype TransactionOutput = TransactionOutput
   { address :: Address
   , amount :: Value
-  , dataHash :: Maybe DataHash
+  , plutusData :: Maybe DataOption
   }
 
 derive instance Generic TransactionOutput _

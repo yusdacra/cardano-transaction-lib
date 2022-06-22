@@ -8,7 +8,10 @@ module Deserialization.UnspentOutput
 
 import Prelude
 
-import Cardano.Types.Transaction (TransactionOutput(TransactionOutput)) as T
+import Cardano.Types.Transaction
+  ( DataOption(DataHash, Data)
+  , TransactionOutput(TransactionOutput)
+  ) as T
 import Cardano.Types.TransactionUnspentOutput
   ( TransactionUnspentOutput(TransactionUnspentOutput)
   ) as T
@@ -20,16 +23,18 @@ import Cardano.Types.Value
   , mkNonAdaAsset
   , mkValue
   ) as T
+import Control.Alt ((<|>))
 import Data.Bitraversable (bitraverse, ltraverse)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe, fromMaybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (wrap, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested (type (/\))
 import Data.UInt as UInt
 import Deserialization.BigNum (bigNumToBigInt)
+import Deserialization.PlutusData (convertPlutusData)
 import FfiHelpers (MaybeFfiHelper, maybeFfiHelper)
 import Serialization (toBytes)
 import Serialization.Address (Address)
@@ -40,6 +45,7 @@ import Serialization.Types
   , BigNum
   , DataHash
   , MultiAsset
+  , PlutusData
   , TransactionHash
   , TransactionInput
   , TransactionOutput
@@ -47,8 +53,9 @@ import Serialization.Types
   , Value
   )
 import Types.ByteArray (ByteArray)
+import Types.Datum (Datum(Datum)) as T
 import Types.Transaction
-  ( DataHash(DataHash)
+  ( DataHash
   , TransactionHash(TransactionHash)
   , TransactionInput(TransactionInput)
   ) as T
@@ -72,14 +79,14 @@ convertInput input = do
     }
 
 convertOutput :: TransactionOutput -> Maybe T.TransactionOutput
-convertOutput output = do
-  amount <- convertValue $ getAmount output
+convertOutput txOutput = do
+  amount <- convertValue $ getAmount txOutput
   let
-    address = getAddress output
-    dataHash =
-      getDataHash maybeFfiHelper output <#>
-        asOneOf >>> toBytes >>> T.DataHash
-  pure $ T.TransactionOutput { address, amount, dataHash }
+    address = getAddress txOutput
+    (plutusData :: Maybe T.DataOption) =
+      (T.DataHash <$> getDataHash txOutput)
+        <|> (T.Data <$> getPlutusData txOutput)
+  pure $ T.TransactionOutput { address, amount, plutusData }
 
 convertValue :: Value -> Maybe T.Value
 convertValue value = do
@@ -134,8 +141,21 @@ foreign import extractAssets
   -> Assets
   -> Array (AssetName /\ BigNum)
 
-foreign import getDataHash
+foreign import _getDataHash
   :: MaybeFfiHelper -> TransactionOutput -> Maybe DataHash
+
+getDataHash :: TransactionOutput -> Maybe T.DataHash
+getDataHash txOutput =
+  _getDataHash maybeFfiHelper txOutput <#>
+    asOneOf >>> toBytes >>> wrap
+
+foreign import _getPlutusData
+  :: MaybeFfiHelper -> TransactionOutput -> Maybe PlutusData
+
+getPlutusData :: TransactionOutput -> Maybe T.Datum
+getPlutusData txOutput =
+  _getPlutusData maybeFfiHelper txOutput >>=
+    convertPlutusData >>> map T.Datum
 
 foreign import mkTransactionUnspentOutput
   :: TransactionInput -> TransactionOutput -> TransactionUnspentOutput

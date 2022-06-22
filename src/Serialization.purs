@@ -29,6 +29,7 @@ import Cardano.Types.Transaction
       )
   , Costmdls(Costmdls)
   , CostModel(CostModel)
+  , DataOption(DataHash, Data)
   , GenesisDelegateHash(GenesisDelegateHash)
   , GenesisHash(GenesisHash)
   , Language(PlutusV1)
@@ -142,6 +143,7 @@ import Serialization.WitnessSet
 import Types.Aliases (Bech32String)
 import Types.ByteArray (ByteArray)
 import Types.CborBytes (CborBytes)
+import Types.Datum (Datum(Datum))
 import Types.RawBytes (RawBytes)
 import Types.Int as Int
 import Types.PlutusData as PlutusData
@@ -164,6 +166,12 @@ foreign import addTransactionInput
 
 foreign import newTransactionOutput
   :: Address -> Value -> Effect TransactionOutput
+
+foreign import transactionOutputSetDataHash
+  :: TransactionOutput -> DataHash -> Effect Unit
+
+foreign import transactionOutputSetPlutusData
+  :: TransactionOutput -> PlutusData -> Effect Unit
 
 foreign import newTransactionOutputs :: Effect TransactionOutputs
 foreign import addTransactionOutput
@@ -199,8 +207,6 @@ foreign import insertMultiAsset
 foreign import newAssets :: Effect Assets
 foreign import insertAssets :: Assets -> AssetName -> BigNum -> Effect Unit
 foreign import newAssetName :: ByteArray -> Effect AssetName
-foreign import transactionOutputSetDataHash
-  :: TransactionOutput -> DataHash -> Effect Unit
 
 foreign import newVkeywitnesses :: Effect Vkeywitnesses
 foreign import makeVkeywitness
@@ -733,13 +739,19 @@ convertTxOutputs arrOutputs = do
   pure outputs
 
 convertTxOutput :: T.TransactionOutput -> Effect TransactionOutput
-convertTxOutput (T.TransactionOutput { address, amount, dataHash }) = do
+convertTxOutput (T.TransactionOutput { address, amount, plutusData }) = do
   value <- convertValue amount
-  txo <- newTransactionOutput address value
-  for_ (unwrap <$> dataHash) \bytes -> do
-    for_ (fromBytes bytes) $
-      transactionOutputSetDataHash txo
-  pure txo
+  txOutput <- newTransactionOutput address value
+  for_ plutusData $ case _ of
+    T.DataHash dataHash ->
+      for_ (fromBytes $ unwrap dataHash) $
+        transactionOutputSetDataHash txOutput
+    T.Data (Datum plutusData') -> do
+      plutusDataCsl <-
+        fromJustEff "convertTxOutput: failed to convert PlutusData" $
+          convertPlutusData plutusData'
+      transactionOutputSetPlutusData txOutput plutusDataCsl
+  pure txOutput
 
 convertValue :: Value.Value -> Effect Value
 convertValue val = do

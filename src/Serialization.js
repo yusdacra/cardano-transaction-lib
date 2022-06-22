@@ -41,6 +41,10 @@ exports.addTransactionInput = inputs => input => () =>
 exports.newTransactionOutput = address => amount => () =>
     lib.TransactionOutput.new(address, amount);
 
+exports.transactionOutputSetDataHash = setter('data_hash');
+
+exports.transactionOutputSetPlutusData = setter('plutus_data');
+
 exports.newTransactionOutputs = () =>
     lib.TransactionOutputs.new();
 
@@ -79,8 +83,6 @@ exports.insertAssets = assets => key => value => () =>
 
 exports.newAssetName = name => () =>
     lib.AssetName.new(name);
-
-exports.transactionOutputSetDataHash = setter('data_hash');
 
 exports.newVkeywitnesses = () =>
     lib.Vkeywitnesses.new();

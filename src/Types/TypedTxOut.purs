@@ -23,7 +23,10 @@ module Types.TypedTxOut
 -- | https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger/html/src/Ledger.Typed.Tx.html
 
 import Prelude
-import Cardano.Types.Transaction (TransactionOutput(TransactionOutput))
+import Cardano.Types.Transaction
+  ( DataOption(DataHash, Data)
+  , TransactionOutput(TransactionOutput)
+  )
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
 import Data.Either (Either, note)
@@ -130,7 +133,23 @@ typedTxOutDatumHash
   => ToData b
   => TypedTxOut a b
   -> Maybe DataHash
-typedTxOutDatumHash (TypedTxOut { txOut }) = (unwrap txOut).dataHash
+typedTxOutDatumHash (TypedTxOut { txOut }) =
+  case (unwrap txOut).plutusData of
+    Just (DataHash dataHash) -> Just dataHash
+    _ -> Nothing
+
+-- | Extract the inline `Datum` of a `TypedTxOut`
+typedTxOutDatum
+  :: forall (a :: Type) (b :: Type)
+   . DatumType a b
+  => FromData b
+  => ToData b
+  => TypedTxOut a b
+  -> Maybe Datum
+typedTxOutDatum (TypedTxOut { txOut }) =
+  case (unwrap txOut).plutusData of
+    Just (Data datum) -> Just datum
+    _ -> Nothing
 
 -- | Extract the `Value` of a `TypedTxOut`
 typedTxOutValue

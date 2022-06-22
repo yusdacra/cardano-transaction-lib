@@ -49,7 +49,8 @@ exports.getCoin = call('coin');
 exports.getMultiAsset = callMaybe('multiasset');
 exports.extractMultiAsset = extractDict;
 exports.extractAssets = extractDict;
-exports.getDataHash = callMaybe('data_hash');
+exports._getDataHash = callMaybe('data_hash');
+exports._getPlutusData = callMaybe('plutus_data');
 exports.mkTransactionUnspentOutput = input => output =>
     lib.TransactionUnspentOutput.new(input, output);
 exports._newTransactionUnspentOutputFromBytes = maybe => bytes => {
