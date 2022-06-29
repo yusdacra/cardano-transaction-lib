@@ -65,18 +65,14 @@ module Cardano.Types.Transaction
   , _vkeys
   , _withdrawals
   , _witnessSet
-  ) where
+  , encodeMap
+  )
+  where
 
 import Prelude
 
-import Aeson
-  ( class DecodeAeson
-  , class EncodeAeson
-  , JsonDecodeError(TypeMismatch)
-  , caseAesonString
-  , decodeAeson
-  , encodeAeson'
-  )
+import Aeson (class DecodeAeson, class EncodeAeson, Aeson, JsonDecodeError(TypeMismatch), caseAesonString, decodeAeson, encodeAeson', encodeTraversable)
+import Aeson.Encode as Encode
 import Cardano.Types.Value (Coin, NonAdaAsset, Value)
 import Control.Alternative ((<|>))
 import Control.Apply (lift2)
@@ -91,20 +87,15 @@ import Data.Lens.Types (Lens')
 import Data.Map (Map)
 import Data.Maybe (Maybe(Nothing))
 import Data.Monoid (guard)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(SProxy))
 import Data.Tuple (Tuple(Tuple))
-import Data.Tuple.Nested (type (/\))
+import Data.Tuple.Nested (type (/\), (/\))
+import Data.Typelevel.Undefined (undefined)
 import Data.UInt (UInt)
 import Helpers ((</>), (<<>>), appendMap)
-import Serialization.Address
-  ( Address
-  , NetworkId
-  , RewardAddress
-  , Slot(Slot)
-  , StakeCredential
-  )
+import Serialization.Address (Address, NetworkId, RewardAddress, Slot(Slot), StakeCredential)
 import Serialization.Hash (Ed25519KeyHash)
 import Serialization.Types (BigNum, VRFKeyHash)
 import Types.Aliases (Bech32String)
@@ -250,11 +241,21 @@ instance Monoid TxBody where
     , networkId: Nothing
     }
 
+--instance EncodeAeson TxBody where
+--  encodeAeson' (TxBody r) = encodeAeson' r
+
+encodeMap :: forall k v . EncodeAeson k => EncodeAeson v => Map k v -> Aeson
+encodeMap m = undefined
+
+tupToObject :: Tuple k v -> Aeson
+tupToObject (Tuple k v) = encodeAeson' {k: v}
+
 newtype ScriptDataHash = ScriptDataHash ByteArray
 
 derive instance Newtype ScriptDataHash _
 derive instance Generic ScriptDataHash _
 derive newtype instance Eq ScriptDataHash
+derive newtype instance EncodeAeson ScriptDataHash
 
 instance Show ScriptDataHash where
   show = genericShow
@@ -270,16 +271,22 @@ derive newtype instance Monoid Mint
 instance Show Mint where
   show = genericShow
 
+instance EncodeAeson Mint where
+  encodeAeson' (Mint asset) = encodeAeson' {
+   nonAdaAsset: asset
+  }
+
 newtype AuxiliaryDataHash = AuxiliaryDataHash ByteArray
 
 derive instance Generic AuxiliaryDataHash _
 derive instance Newtype AuxiliaryDataHash _
 derive newtype instance Eq AuxiliaryDataHash
+derive newtype instance EncodeAeson AuxiliaryDataHash
 
 instance Show AuxiliaryDataHash where
   show = genericShow
 
-type Update =
+type Update = Update
   { proposedProtocolParameterUpdates :: ProposedProtocolParameterUpdates
   , epoch :: Epoch
   }
@@ -295,6 +302,9 @@ derive instance Generic ProposedProtocolParameterUpdates _
 
 instance Show ProposedProtocolParameterUpdates where
   show = genericShow
+
+--instance EncodeAeson ProposedProtocolParameterUpdates where
+--  encodeAeson' = pure <<< encodeTraversable <<< unwrap
 
 newtype GenesisHash = GenesisHash ByteArray
 
@@ -410,6 +420,7 @@ newtype Epoch = Epoch UInt
 derive instance Newtype Epoch _
 derive instance Generic Epoch _
 derive newtype instance Eq Epoch
+derive newtype instance EncodeAeson Epoch
 
 instance Show Epoch where
   show = genericShow
@@ -544,6 +555,16 @@ derive instance Generic Certificate _
 instance Show Certificate where
   show = genericShow
 
+--instance EncodeAeson Certificate where
+--  encodeAeson' cert = case cert of
+--    StakeRegistration _ -> undefined
+--    StakeDeregistration _ -> undefined
+--    StakeDelegation _ _ -> undefined
+--    PoolRegistration _ -> undefined
+--    PoolRetirement _ -> undefined
+--    GenesisKeyDelegation _ -> undefined
+--    MoveInstantaneousRewardsCert _ -> undefined
+--
 --------------------------------------------------------------------------------
 -- `TxBody` Lenses
 --------------------------------------------------------------------------------
@@ -677,6 +698,11 @@ derive instance Generic RequiredSigner _
 instance Show RequiredSigner where
   show = genericShow
 
+--instance EncodeAeson RequiredSigner where
+--  encodeAeson' (RequiredSigner k) = encodeAeson' {
+--    ed25519KeyHash: k
+--  }
+
 newtype Vkeywitness = Vkeywitness (Vkey /\ Ed25519Signature)
 
 derive instance Generic Vkeywitness _
@@ -782,6 +808,9 @@ derive newtype instance Eq TransactionOutput
 
 instance Show TransactionOutput where
   show = genericShow
+
+--instance EncodeAeson TransactionOutput where
+--  encodeAeson' (TransactionOutput r) = encodeAeson' r
 
 newtype UtxoM = UtxoM Utxo
 

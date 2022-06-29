@@ -49,14 +49,7 @@ module Cardano.Types.Value
 
 import Prelude hiding (join)
 
-import Aeson
-  ( class DecodeAeson
-  , class EncodeAeson
-  , JsonDecodeError(TypeMismatch)
-  , caseAesonObject
-  , encodeAeson'
-  , getField
-  )
+import Aeson (class DecodeAeson, class EncodeAeson, Aeson, JsonDecodeError(TypeMismatch), caseAesonObject, encodeAeson, encodeAeson', encodeTraversable, getField)
 import Control.Alt ((<|>))
 import Control.Alternative (guard)
 import Data.Array (cons, filter)
@@ -90,13 +83,7 @@ import Serialization.Hash (ScriptHash, scriptHashFromBytes, scriptHashToBytes)
 import ToData (class ToData)
 import Types.ByteArray (ByteArray, byteArrayToHex, byteLength, hexToByteArray)
 import Types.Scripts (MintingPolicyHash(MintingPolicyHash))
-import Types.TokenName
-  ( TokenName
-  , adaToken
-  , getTokenName
-  , mkTokenName
-  , mkTokenNames
-  )
+import Types.TokenName (TokenName, adaToken, getTokenName, mkTokenName, mkTokenNames)
 
 -- `Negate` and `Split` seem a bit too contrived, and their purpose is to
 -- combine similar behaviour without satisfying any useful laws. I wonder
@@ -129,6 +116,7 @@ derive instance Generic Coin _
 derive instance Newtype Coin _
 derive newtype instance Eq Coin
 derive newtype instance Ord Coin
+derive newtype instance EncodeAeson Coin
 
 instance Show Coin where
   show (Coin c) = showWithParens "Coin" c
@@ -265,6 +253,10 @@ instance Split NonAdaAsset where
         mp'
 
     npos /\ pos = mapThese splitIntl mp
+
+instance EncodeAeson NonAdaAsset where
+  encodeAeson' (NonAdaAsset m) =
+    pure $ encodeTraversable $ encodeTraversable <$> m
 
 -- We shouldn't need this check if we don't export unsafeAdaSymbol etc.
 -- | Create a singleton `NonAdaAsset` which by definition should be safe since

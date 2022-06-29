@@ -1,95 +1,97 @@
 module Serialization.Address
-  ( Slot(Slot)
-  , BlockId(BlockId)
-  , TransactionIndex(TransactionIndex)
-  , CertificateIndex(CertificateIndex)
-  , Pointer
-  , Address
+  ( Address
   , BaseAddress
+  , BlockId(..)
   , ByronAddress
+  , ByronProtocolMagic(..)
+  , CertificateIndex(..)
   , EnterpriseAddress
+  , NetworkId(..)
+  , Pointer
   , PointerAddress
   , RewardAddress
+  , Slot(..)
   , StakeCredential
-  , addressBytes
+  , TransactionIndex(..)
   , addressBech32
-  , addressNetworkId
-  , intToNetworkId
-  , keyHashCredential
-  , scriptHashCredential
-  , withStakeCredential
-  , stakeCredentialToBytes
-  , baseAddress
-  , baseAddressPaymentCred
-  , baseAddressDelegationCred
-  , baseAddressToAddress
-  , ByronProtocolMagic(ByronProtocolMagic)
-  , NetworkId(..)
-  , pubKeyAddress
-  , scriptAddress
-  , stakeCredentialToKeyHash
-  , stakeCredentialToScriptHash
-  , stakeCredentialFromBytes
-  , addressFromBytes
+  , addressBytes
   , addressFromBech32
+  , addressFromBytes
+  , addressNetworkId
   , addressPaymentCred
-  , baseAddressFromAddress
-  , baseAddressBytes
+  , baseAddress
   , baseAddressBech32
-  , baseAddressFromBytes
+  , baseAddressBytes
+  , baseAddressDelegationCred
+  , baseAddressFromAddress
   , baseAddressFromBech32
+  , baseAddressFromBytes
   , baseAddressNetworkId
-  , byronAddressToBase58
+  , baseAddressPaymentCred
+  , baseAddressToAddress
+  , byronAddressAttributes
+  , byronAddressBytes
+  , byronAddressFromAddress
   , byronAddressFromBase58
   , byronAddressFromBytes
-  , byronAddressBytes
-  , byronProtocolMagic
-  , byronAddressAttributes
-  , byronAddressNetworkId
-  , byronAddressFromAddress
-  , byronAddressToAddress
   , byronAddressIsValid
-  , icarusFromKey
+  , byronAddressNetworkId
+  , byronAddressToAddress
+  , byronAddressToBase58
+  , byronProtocolMagic
   , enterpriseAddress
+  , enterpriseAddressBech32
+  , enterpriseAddressBytes
+  , enterpriseAddressFromAddress
+  , enterpriseAddressFromBech32
+  , enterpriseAddressFromBytes
+  , enterpriseAddressNetworkId
   , enterpriseAddressPaymentCred
   , enterpriseAddressToAddress
-  , enterpriseAddressFromAddress
-  , enterpriseAddressBytes
-  , enterpriseAddressBech32
-  , enterpriseAddressFromBytes
-  , enterpriseAddressFromBech32
-  , enterpriseAddressNetworkId
-  , networkIdtoInt
+  , icarusFromKey
+  , intToNetworkId
+  , keyHashCredential
   , pointerAddress
-  , pointerAddressPaymentCred
-  , pointerAddressToAddress
-  , pointerAddressFromAddress
-  , pointerAddressStakePointer
-  , pointerAddressBytes
   , pointerAddressBech32
-  , pointerAddressFromBytes
+  , pointerAddressBytes
+  , pointerAddressFromAddress
   , pointerAddressFromBech32
+  , pointerAddressFromBytes
   , pointerAddressNetworkId
+  , pointerAddressPaymentCred
+  , pointerAddressStakePointer
+  , pointerAddressToAddress
+  , pubKeyAddress
   , rewardAddress
+  , rewardAddressBech32
+  , rewardAddressBytes
+  , rewardAddressFromAddress
+  , rewardAddressFromBech32
+  , rewardAddressFromBytes
+  , rewardAddressNetworkId
   , rewardAddressPaymentCred
   , rewardAddressToAddress
-  , rewardAddressBytes
-  , rewardAddressBech32
-  , rewardAddressFromBytes
-  , rewardAddressFromBech32
-  , rewardAddressNetworkId
-  , rewardAddressFromAddress
+  , scriptAddress
+  , scriptHashCredential
+  , stakeCredentialFromBytes
+  , stakeCredentialToBytes
+  , stakeCredentialToKeyHash
+  , stakeCredentialToScriptHash
   , unsafeIntToNetId
-  ) where
+  , withStakeCredential
+  )
+  where
 
 import Prelude
 
-import Aeson (class DecodeAeson, class EncodeAeson, encodeAeson')
+import Aeson (class DecodeAeson, class EncodeAeson, encodeAeson, encodeAeson')
+import Aeson.Encode as Encode
 import Control.Alt ((<|>))
 import Data.Function (on)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Just, Nothing), fromJust)
 import Data.Newtype (class Newtype, unwrap, wrap)
+import Data.Op (Op(..))
 import Data.Show.Generic (genericShow)
 import Data.UInt (UInt)
 import Data.UInt as UInt
@@ -354,6 +356,11 @@ newtype ByronProtocolMagic = ByronProtocolMagic UInt
 data NetworkId
   = TestnetId
   | MainnetId
+
+instance EncodeAeson NetworkId where
+  encodeAeson' = case _ of
+    TestnetId -> pure $ Encode.encodeTagged "TestnetId" {} (Op encodeAeson)
+    MainnetId -> pure $ Encode.encodeTagged "MainnetId" {} (Op encodeAeson)
 
 networkIdtoInt :: NetworkId -> Int
 networkIdtoInt = case _ of
