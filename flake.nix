@@ -169,7 +169,7 @@
       defaultConfig = final: with final; {
         inherit (inputs) cardano-configurations;
         network = {
-          name = "vasil-dev";
+          name = "testnet";
           magic = 9; # use `null` for mainnet
         };
         node = { port = 3001; };
