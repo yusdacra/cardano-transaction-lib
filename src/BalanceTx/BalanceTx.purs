@@ -1,25 +1,47 @@
 module BalanceTx
-  ( Actual(..)
-  , AddTxCollateralsError(..)
-  , BalanceNonAdaOutsError(..)
-  , BalanceTxError(..)
-  , BalanceTxInsError(..)
-  , CannotMinusError(..)
-  , EvalExUnitsAndMinFeeError(..)
-  , Expected(..)
+  ( balanceTx
+  , module BalanceTxError
   , FinalizedTransaction(..)
-  , GetPublicKeyTransactionInputError(..)
-  , GetWalletAddressError(..)
-  , GetWalletCollateralError(..)
-  , TxInputLockedError(..)
-  , ImpossibleError(..)
-  , ReturnAdaChangeError(..)
-  , UtxosAtError(..)
-  , balanceTx
   ) where
 
 import Prelude
 
+import BalanceTx.Internal.Error (BalanceTxError) as BalanceTxError
+import BalanceTx.Internal.Error
+  ( BalanceTxError
+      ( BalanceNonAdaOutsError'
+      , BalanceTxInsError'
+      , CalculateMinFeeError'
+      , CouldNotGetCollateralError
+      , CouldNotGetUtxosError
+      , CouldNotGetWalletAddressError
+      , GetPublicKeyTransactionInputError'
+      , ReturnAdaChangeError'
+      )
+  , Actual(Actual)
+  , BalanceNonAdaOutsError
+      ( BalanceNonAdaOutsCannotMinus
+      , InputsCannotBalanceNonAdaTokens
+      )
+  , BalanceTxInsError
+      ( BalanceTxInsCannotMinus
+      , InsufficientTxInputs
+      )
+  , CalculateMinFeeError
+      ( CalculateMinFeeError
+      , ReindexRedeemersError
+      )
+  , CannotMinusError(CannotMinus)
+  , CollectTxInsError(CollectTxInsInsufficientTxInputs)
+  , Expected(Expected)
+  , GetPublicKeyTransactionInputError(CannotConvertScriptOutputToTxInput)
+  , ImpossibleError(Impossible)
+  , ReturnAdaChangeError
+      ( ReturnAdaChangeCalculateMinFee
+      , ReturnAdaChangeError
+      , ReturnAdaChangeImpossibleError
+      )
+  )
 import Cardano.Types.Transaction
   ( Redeemer(Redeemer)
   , Transaction(Transaction)
@@ -69,6 +91,8 @@ import Control.Monad.Logger.Class (class MonadLogger)
 import Control.Monad.Logger.Class as Logger
 import Control.Monad.Reader.Class (asks)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Reader.Trans (ReaderT)
+import Control.Monad.State.Trans (StateT)
 import Data.Array ((\\), modifyAt)
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
@@ -112,150 +136,6 @@ import Types.UnbalancedTransaction (UnbalancedTx(UnbalancedTx), _transaction)
 import Untagged.Union (asOneOf)
 import Wallet (Wallet(KeyWallet), cip30Wallet)
 
--- This module replicates functionality from
--- https://github.com/mlabs-haskell/bot-plutus-interface/blob/master/src/BotPlutusInterface/PreBalance.hs
-
---------------------------------------------------------------------------------
--- Errors for Balancing functions
---------------------------------------------------------------------------------
--- These derivations may need tweaking when testing to make sure they are easy
--- to read, especially with generic show vs newtype show derivations.
-data BalanceTxError
-  = GetWalletAddressError' GetWalletAddressError
-  | GetWalletCollateralError' GetWalletCollateralError
-  | UtxosAtError' UtxosAtError
-  | ReturnAdaChangeError' ReturnAdaChangeError
-  | AddTxCollateralsError' AddTxCollateralsError
-  | GetPublicKeyTransactionInputError' GetPublicKeyTransactionInputError
-  | BalanceTxInsError' BalanceTxInsError
-  | BalanceNonAdaOutsError' BalanceNonAdaOutsError
-  | EvalExUnitsAndMinFeeError' EvalExUnitsAndMinFeeError
-  | TxInputLockedError' TxInputLockedError
-
-derive instance Generic BalanceTxError _
-
-instance Show BalanceTxError where
-  show = genericShow
-
-data GetWalletAddressError = CouldNotGetWalletAddress
-
-derive instance Generic GetWalletAddressError _
-
-instance Show GetWalletAddressError where
-  show = genericShow
-
-data GetWalletCollateralError = CouldNotGetCollateral
-
-derive instance Generic GetWalletCollateralError _
-
-instance Show GetWalletCollateralError where
-  show = genericShow
-
-data UtxosAtError = CouldNotGetUtxos
-
-derive instance Generic UtxosAtError _
-
-instance Show UtxosAtError where
-  show = genericShow
-
-data EvalExUnitsAndMinFeeError
-  = EvalMinFeeError ClientError
-  | ReindexRedeemersError ReindexErrors
-
-derive instance Generic EvalExUnitsAndMinFeeError _
-
-instance Show EvalExUnitsAndMinFeeError where
-  show = genericShow
-
-data ReturnAdaChangeError
-  = ReturnAdaChangeError String
-  | ReturnAdaChangeImpossibleError String ImpossibleError
-  | ReturnAdaChangeCalculateMinFee EvalExUnitsAndMinFeeError
-
-derive instance Generic ReturnAdaChangeError _
-
-instance Show ReturnAdaChangeError where
-  show = genericShow
-
-data AddTxCollateralsError
-  = CollateralUtxosUnavailable
-  | AddTxCollateralsError
-
-derive instance Generic AddTxCollateralsError _
-
-instance Show AddTxCollateralsError where
-  show = genericShow
-
-data GetPublicKeyTransactionInputError = CannotConvertScriptOutputToTxInput
-
-derive instance Generic GetPublicKeyTransactionInputError _
-
-instance Show GetPublicKeyTransactionInputError where
-  show = genericShow
-
-data BalanceTxInsError
-  = InsufficientTxInputs Expected Actual
-  | BalanceTxInsCannotMinus CannotMinusError
-
-derive instance Generic BalanceTxInsError _
-
-instance Show BalanceTxInsError where
-  show = genericShow
-
-data CannotMinusError = CannotMinus Actual
-
-derive instance Generic CannotMinusError _
-
-instance Show CannotMinusError where
-  show = genericShow
-
-data CollectTxInsError = CollectTxInsInsufficientTxInputs BalanceTxInsError
-
-derive instance Generic CollectTxInsError _
-
-instance Show CollectTxInsError where
-  show = genericShow
-
-newtype Expected = Expected Value
-
-derive instance Generic Expected _
-derive instance Newtype Expected _
-
-instance Show Expected where
-  show = genericShow
-
-newtype Actual = Actual Value
-
-derive instance Generic Actual _
-derive instance Newtype Actual _
-
-instance Show Actual where
-  show = genericShow
-
-data BalanceNonAdaOutsError
-  = InputsCannotBalanceNonAdaTokens
-  | BalanceNonAdaOutsCannotMinus CannotMinusError
-
-derive instance Generic BalanceNonAdaOutsError _
-
-instance Show BalanceNonAdaOutsError where
-  show = genericShow
-
-data TxInputLockedError = TxInputLockedError
-
-derive instance Generic TxInputLockedError _
-
-instance Show TxInputLockedError where
-  show = genericShow
-
--- | Represents that an error reason should be impossible
-data ImpossibleError = Impossible
-
-derive instance Generic ImpossibleError _
-
-instance Show ImpossibleError where
-  show = genericShow
-
 --------------------------------------------------------------------------------
 -- Newtype wrappers, Type aliases, Temporary placeholder types
 --------------------------------------------------------------------------------
@@ -291,7 +171,7 @@ evalTxExecutionUnits tx =
 evalExUnitsAndMinFee'
   :: UnattachedUnbalancedTx
   -> QueryM
-       (Either EvalExUnitsAndMinFeeError (UnattachedUnbalancedTx /\ BigInt))
+       (Either CalculateMinFeeError (UnattachedUnbalancedTx /\ BigInt))
 evalExUnitsAndMinFee' unattachedTx =
   runExceptT do
     -- Reindex `Spent` script redeemers:
@@ -310,14 +190,14 @@ evalExUnitsAndMinFee' unattachedTx =
       finalizeTransaction reindexedUnattachedTxWithExUnits
     -- Calculate the minimum fee for a transaction:
     minFee <- ExceptT $ QueryM.calculateMinFee finalizedTx
-      <#> bimap EvalMinFeeError unwrap
+      <#> bimap CalculateMinFeeError unwrap
     pure $ reindexedUnattachedTxWithExUnits /\ minFee
 
 evalExUnitsAndMinFee
   :: UnattachedUnbalancedTx
   -> QueryM (Either BalanceTxError (UnattachedUnbalancedTx /\ BigInt))
 evalExUnitsAndMinFee =
-  map (lmap EvalExUnitsAndMinFeeError') <<< evalExUnitsAndMinFee'
+  map (lmap CalculateMinFeeError') <<< evalExUnitsAndMinFee'
 
 -- | Attaches datums and redeemers, sets the script integrity hash,
 -- | for use after reindexing.
@@ -434,14 +314,14 @@ balanceTx unattachedTx@(UnattachedUnbalancedTx { unbalancedTx: t }) = do
   runExceptT do
     -- Get own wallet address, collateral and utxo set:
     ownAddr <- ExceptT $ QueryM.getWalletAddress <#>
-      note (GetWalletAddressError' CouldNotGetWalletAddress)
+      note CouldNotGetWalletAddressError
     wallet <- asks _.wallet
     utxos <- ExceptT $ utxosAt ownAddr <#>
-      (note (UtxosAtError' CouldNotGetUtxos) >>> map unwrap)
+      (note CouldNotGetUtxosError >>> map unwrap)
     collateral <- case wallet of
       Just w | isJust (cip30Wallet w) ->
         map Just $ ExceptT $ QueryM.getWalletCollateral <#>
-          note (GetWalletCollateralError' CouldNotGetCollateral)
+          note CouldNotGetCollateralError
       -- TODO: Combine with getWalletCollateral, and supply with fee estimate
       --       https://github.com/Plutonomicon/cardano-transaction-lib/issues/510
       Just (KeyWallet kw) -> pure $ kw.selectCollateral utxos
