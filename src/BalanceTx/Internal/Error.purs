@@ -1,4 +1,4 @@
-module BalanceTx.Error
+module BalanceTx.Internal.Error
   ( BalanceTxError(..)
   , Actual(..)
   , BalanceNonAdaOutsError(..)
