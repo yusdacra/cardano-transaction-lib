@@ -1,7 +1,6 @@
 module Serialization.AuxiliaryData
   ( convertAuxiliaryData
   , hashAuxiliaryData
-  , setTxAuxiliaryData
   ) where
 
 import Prelude
@@ -18,15 +17,12 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import FfiHelpers (ContainerHelper, containerHelper)
 import Helpers (fromJustEff)
-import Serialization.BigNum (bigNumFromBigInt)
 import Serialization.NativeScript (convertNativeScripts)
 import Serialization.Types
   ( AuxiliaryData
-  , BigNum
   , GeneralTransactionMetadata
   , NativeScripts
   , PlutusScripts
-  , Transaction
   , TransactionMetadatum
   )
 import Serialization.WitnessSet
@@ -34,6 +30,8 @@ import Serialization.WitnessSet
   , convertPlutusScript
   , newPlutusScripts
   )
+import Types.BigNum (BigNum)
+import Types.BigNum (fromBigInt) as BigNum
 import Types.ByteArray (ByteArray)
 import Types.Int as Int
 import Types.TransactionMetadata
@@ -41,8 +39,6 @@ import Types.TransactionMetadata
   , TransactionMetadatum(Text, Bytes, Int, MetadataList, MetadataMap)
   , TransactionMetadatumLabel(TransactionMetadatumLabel)
   ) as T
-
-foreign import setTxAuxiliaryData :: Transaction -> AuxiliaryData -> Effect Unit
 
 foreign import newAuxiliaryData :: Effect AuxiliaryData
 
@@ -112,7 +108,7 @@ convertGeneralTransactionMetadata (T.GeneralTransactionMetadata mp) = do
         label <-
           fromJustEff
             "convertGeneralTransactionMetadata: failing to convert MetadataumLabel"
-            (bigNumFromBigInt l)
+            (BigNum.fromBigInt l)
         datum <- convertTransactionMetadatum d
         pure $ label /\ datum
 

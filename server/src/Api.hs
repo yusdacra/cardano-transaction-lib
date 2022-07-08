@@ -2,14 +2,11 @@ module Api (
   app,
   estimateTxFees,
   applyArgs,
-  finalizeTx,
-  evalTxExecutionUnits,
   apiDocs,
 ) where
 
 import Api.Handlers qualified as Handlers
-import Cardano.Api qualified as C (displayError)
-import Control.Monad.Catch (try)
+import Control.Monad.Catch (catchAll, try)
 import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ReaderT, runReaderT)
@@ -19,14 +16,11 @@ import Data.Proxy (Proxy (Proxy))
 import Network.Wai.Middleware.Cors qualified as Cors
 import Servant (
   Application,
-  Get,
   Handler,
   HasServer (ServerT),
   JSON,
   Post,
-  QueryParam',
   ReqBody,
-  Required,
   Server,
   ServerError (errBody),
   err400,
@@ -41,23 +35,11 @@ import Types (
   AppM (AppM),
   AppliedScript,
   ApplyArgsRequest,
-  EvalExUnitsRequest,
-  CardanoError (
-    AcquireFailure,
-    EraMismatchError,
-    ScriptExecutionError,
-    TxValidityIntervalError
-  ),
-  Cbor,
   CborDecodeError (InvalidCbor, InvalidHex, OtherDecodeError),
-  CtlServerError (CardanoError, CborDecode),
+  CtlServerError (CborDecode, ErrorCall),
   Env,
-  ExecutionUnitsMap,
   Fee,
   FeesRequest,
-  FinalizeRequest,
-  FinalizedTransaction,
-  WitnessCount,
  )
 import Utils (lbshow)
 
@@ -70,12 +52,6 @@ type Api =
     :<|> "apply-args"
       :> ReqBody '[JSON] ApplyArgsRequest
       :> Post '[JSON] AppliedScript
-    :<|> "eval-ex-units"
-      :> ReqBody '[JSON] EvalExUnitsRequest
-      :> Post '[JSON] ExecutionUnitsMap
-    :<|> "finalize"
-      :> ReqBody '[JSON] FinalizeRequest
-      :> Post '[JSON] FinalizedTransaction
 
 app :: Env -> Application
 app = Cors.cors (const $ Just policy) . serve api . appServer
@@ -93,26 +69,12 @@ appServer env = hoistServer api appHandler server
     appHandler :: forall (a :: Type). AppM a -> Handler a
     appHandler (AppM x) = tryServer x >>= either handleError pure
       where
-        tryServer ::
-          ReaderT Env IO a ->
-          Handler (Either CtlServerError a)
-        tryServer =
-          liftIO
-            . try @_ @CtlServerError
-            . flip runReaderT env
+        tryServer :: ReaderT Env IO a -> Handler (Either CtlServerError a)
+        tryServer ra =
+          liftIO (try @_ @CtlServerError $ runReaderT ra env)
+            `catchAll` (pure . Left . ErrorCall)
 
-        handleError ::
-          CtlServerError ->
-          Handler a
-        handleError (CardanoError ce) = case ce of
-          AcquireFailure str ->
-            throwError err400 {errBody = LC8.pack str}
-          ScriptExecutionError err ->
-            throwError err400 {errBody = LC8.pack (C.displayError err)}
-          TxValidityIntervalError str ->
-            throwError err400 {errBody = LC8.pack str}
-          EraMismatchError ->
-            throwError err400 {errBody = lbshow EraMismatchError}
+        handleError :: CtlServerError -> Handler a
         handleError (CborDecode de) = case de of
           InvalidCbor ic ->
             throwError err400 {errBody = lbshow ic}
@@ -120,26 +82,18 @@ appServer env = hoistServer api appHandler server
             throwError err400 {errBody = LC8.pack ih}
           OtherDecodeError str ->
             throwError err400 {errBody = LC8.pack str}
+        handleError (ErrorCall err) =
+          throwError err400 {errBody = LC8.pack $ show err}
 
 api :: Proxy Api
 api = Proxy
 
 server :: ServerT Api AppM
-server =
-  Handlers.estimateTxFees
-    :<|> Handlers.applyArgs
-    :<|> Handlers.evalTxExecutionUnits
-    :<|> Handlers.finalizeTx
+server = Handlers.estimateTxFees :<|> Handlers.applyArgs
 
 apiDocs :: Docs.API
 apiDocs = Docs.docs api
 
 estimateTxFees :: FeesRequest -> ClientM Fee
 applyArgs :: ApplyArgsRequest -> ClientM AppliedScript
-evalTxExecutionUnits :: EvalExUnitsRequest -> ClientM ExecutionUnitsMap
-finalizeTx :: FinalizeRequest -> ClientM FinalizedTransaction
-estimateTxFees
-  :<|> applyArgs
-  :<|> evalTxExecutionUnits
-  :<|> finalizeTx =
-    client api
+estimateTxFees :<|> applyArgs = client api

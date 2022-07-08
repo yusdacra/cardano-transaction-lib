@@ -8,9 +8,9 @@ module Contract.Monad
   , module QueryM
   , module Log.Level
   , module Log.Tag
-  , wrapContract
-  , defaultContractConfig
-  , defaultContractConfigLifted
+  , configWithLogLevel
+  , defaultTestnetContractConfig
+  , liftContractAffM
   , liftContractE
   , liftContractE'
   , liftContractM
@@ -31,15 +31,16 @@ module Contract.Monad
   , runContract
   , runContract_
   , throwContractError
-  , traceContractConfig
+  , traceTestnetContractConfig
+  , wrapContract
   ) where
 
 import Prelude
 
 import Control.Monad.Error.Class (class MonadError, class MonadThrow)
-import Control.Monad.Logger.Trans (runLoggerT)
 import Control.Monad.Logger.Class (class MonadLogger)
 import Control.Monad.Logger.Class as Logger
+import Control.Monad.Logger.Trans (runLoggerT)
 import Control.Monad.Reader.Class
   ( class MonadAsk
   , class MonadReader
@@ -72,7 +73,6 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, throw)
 import Helpers (logWithLevel)
-import QueryM (QueryM, QueryMExtended, QueryConfig)
 import QueryM
   ( DatumCacheListeners
   , DatumCacheWebSocket
@@ -92,6 +92,8 @@ import QueryM
   , mkOgmiosWebSocketAff
   , mkWsUrl
   ) as QueryM
+import QueryM (QueryM, QueryMExtended, QueryConfig)
+import QueryM.ProtocolParameters (getProtocolParametersAff) as Ogmios
 import Record as Record
 import Serialization.Address (NetworkId(TestnetId))
 import Types.UsedTxOuts (newUsedTxOuts)
@@ -185,6 +187,7 @@ mkContractConfig
   ogmiosWs <- QueryM.mkOgmiosWebSocketAff logLevel params.ogmiosConfig
   datumCacheWs <- QueryM.mkDatumCacheWebSocketAff logLevel
     params.datumCacheConfig
+  pparams <- Ogmios.getProtocolParametersAff ogmiosWs logLevel
   usedTxOuts <- newUsedTxOuts
   let
     queryConfig =
@@ -195,6 +198,7 @@ mkContractConfig
       , wallet
       , datumCacheWs
       , serverConfig: params.ctlServerConfig
+      , pparams
       }
   pure $ wrap $ queryConfig `Record.union` params.extraConfig
 
@@ -224,6 +228,14 @@ liftedM
   -> Contract r (Maybe a)
   -> Contract r a
 liftedM str cm = cm >>= liftContractM str
+
+-- | Same as `liftContractM` but the `Maybe` value is in the `Aff` context.
+liftContractAffM
+  :: forall (r :: Row Type) (a :: Type)
+   . String
+  -> Aff (Maybe a)
+  -> Contract r a
+liftContractAffM str = liftedM str <<< liftAff
 
 -- | Similar to `liftContractE` except it directly throws the showable error
 -- | via `throwContractError` instead of an arbitrary string.
@@ -286,33 +298,36 @@ runContract_ config = void <<< runContract config
 
 -- | Creates a default `ContractConfig` with a Nami wallet inside `Aff` as
 -- | required by the websockets.
-defaultContractConfig :: Aff DefaultContractConfig
-defaultContractConfig = configWithLogLevel Error
+defaultTestnetContractConfig :: Aff DefaultContractConfig
+defaultTestnetContractConfig = do
+  wallet <- mkNamiWalletAff
+  configWithLogLevel TestnetId wallet Error
 
-traceContractConfig :: Aff DefaultContractConfig
-traceContractConfig = configWithLogLevel Trace
+-- | Same as `defaultTestnetContractConfig` but with `Trace` config level.
+-- | Should be used for testing.
+traceTestnetContractConfig :: Aff DefaultContractConfig
+traceTestnetContractConfig = do
+  wallet <- mkNamiWalletAff
+  configWithLogLevel TestnetId wallet Trace
 
-configWithLogLevel :: LogLevel -> Aff DefaultContractConfig
-configWithLogLevel logLevel = do
-  wallet <- Just <$> mkNamiWalletAff
+configWithLogLevel
+  :: NetworkId -> Wallet -> LogLevel -> Aff DefaultContractConfig
+configWithLogLevel networkId wallet logLevel = do
   ogmiosWs <- QueryM.mkOgmiosWebSocketAff logLevel QueryM.defaultOgmiosWsConfig
   datumCacheWs <-
     QueryM.mkDatumCacheWebSocketAff logLevel QueryM.defaultDatumCacheWsConfig
+  pparams <- Ogmios.getProtocolParametersAff ogmiosWs logLevel
   usedTxOuts <- newUsedTxOuts
   pure $ ContractConfig
     { ogmiosWs
     , datumCacheWs
-    , wallet
+    , wallet: Just wallet
     , usedTxOuts
     , serverConfig: QueryM.defaultServerConfig
-    , networkId: TestnetId
+    , networkId
     , logLevel
+    , pparams
     }
-
--- | Same as `defaultContractConfig` but lifted into `Contract`.
-defaultContractConfigLifted
-  :: forall (r :: Row Type). Contract r DefaultContractConfig
-defaultContractConfigLifted = liftAff defaultContractConfig
 
 -- Logging effects
 

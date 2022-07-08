@@ -24,11 +24,12 @@ import Prelude hiding (join)
 
 import Address (enterpriseAddressValidatorHash)
 import Cardano.Types.Transaction
-  ( ExUnits
+  ( Costmdls
+  , ExUnits
   , Transaction
   , TransactionOutput(TransactionOutput)
-  , TxBody
   , TransactionWitnessSet(TransactionWitnessSet)
+  , TxBody
   , _body
   , _inputs
   , _mint
@@ -58,37 +59,41 @@ import Control.Monad.Reader.Trans (ReaderT)
 import Control.Monad.State.Trans (StateT, get, gets, put, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array ((:), singleton, union) as Array
-import Data.Array (elemIndex, insert, toUnfoldable, zip)
+import Data.Array (filter, mapWithIndex, toUnfoldable, zip)
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Either (Either(Left, Right), either, note)
 import Data.Foldable (foldM)
 import Data.Generic.Rep (class Generic)
 import Data.Lattice (join)
-import Data.Lens ((%=), (%~), (.=), (.~), (<>=))
+import Data.Lens ((%=), (.=), (<>=), (.~), (%~))
 import Data.Lens.Getter (to, use)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Lens.Types (Lens')
 import Data.List (List(Nil, Cons))
-import Data.Map (Map, empty, fromFoldable, lookup, mapMaybe, singleton, union)
+import Data.Map (Map, empty, fromFoldable, lookup, singleton, union)
+import Data.Map (insert, toUnfoldable) as Map
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Newtype (class Newtype, over, unwrap, wrap)
+import Data.Set (insert) as Set
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(SProxy))
-import Data.Traversable (for, traverse)
-import Data.Tuple (Tuple(..), fst)
+import Data.Traversable (sequence, traverse, traverse_)
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import FromData (class FromData)
 import Hashing (datumHash) as Hashing
 import Helpers ((<\>), liftEither, liftM)
-import Plutus.FromPlutusType (fromPlutusType)
+import Plutus.Conversion (fromPlutusTxOutput, fromPlutusValue)
 import Plutus.Types.Transaction (TransactionOutput) as Plutus
 import QueryM (DefaultQueryConfig, QueryM, getDatumByHash)
 import QueryM.EraSummaries (getEraSummaries)
+import QueryM.ProtocolParameters (getProtocolParameters)
 import QueryM.SystemStart (getSystemStart)
 import Scripts
   ( mintingPolicyHash
@@ -104,7 +109,6 @@ import Transaction
   , attachRedeemer
   , setScriptDataHash
   )
-import TxOutput (transactionOutputToScriptOutput)
 import Types.Any (Any)
 import Types.Datum (DataHash, Datum)
 import Types.Interval
@@ -167,7 +171,6 @@ import Types.UnbalancedTransaction
   , _transaction
   , _utxoIndex
   , emptyUnbalancedTx
-  , payPubKeyRequiredSigner
   )
 
 -- Taken mainly from https://playground.plutus.iohkdev.io/doc/haddock/plutus-ledger-constraints/html/Ledger-Constraints-OffChain.html
@@ -189,10 +192,12 @@ newtype ScriptLookups (a :: Type) = ScriptLookups
   { mps ::
       Array MintingPolicy -- Minting policies that the script interacts with
   , txOutputs ::
-      Map TransactionInput Plutus.TransactionOutput -- Unspent outputs that the script may want to spend. This may need tweaking to `TransactionOutput`
+      Map TransactionInput Plutus.TransactionOutput -- Unspent outputs that the script may want to spend
   , scripts ::
       Array Validator -- Script validators
   , datums :: Map DataHash Datum --  Datums that we might need
+  -- FIXME there's currently no way to set this field
+  -- See https://github.com/Plutonomicon/cardano-transaction-lib/issues/569
   , paymentPubKeyHashes ::
       Map PaymentPubKeyHash PaymentPubKey -- Public keys that we might need
   , typedValidator ::
@@ -318,20 +323,6 @@ datum dt =
   Hashing.datumHash dt
     <#> \dh -> over ScriptLookups _ { datums = singleton dh dt } mempty
 
--- -- | A script lookups value with a payment public key. This can fail because we
--- -- | invoke `payPubKeyHash`.
--- paymentPubKeyM :: forall (a :: Type). PaymentPubKey -> Maybe (ScriptLookups a)
--- paymentPubKeyM ppk = do
---   pkh <- payPubKeyHash ppk
---   pure $ over ScriptLookups
---     _ { paymentPubKeyHashes = singleton pkh ppk }
---     mempty
-
--- -- | A script lookups value with a payment public key. This is unsafe because
--- -- | the underlying function `paymentPubKeyM` can fail.
--- unsafePaymentPubKey :: forall (a :: Type). PaymentPubKey -> ScriptLookups a
--- unsafePaymentPubKey = unsafePartial fromJust <<< paymentPubKeyM
-
 -- | Add your own `PaymentPubKeyHash` to the lookup.
 ownPaymentPubKeyHash :: forall (a :: Type). PaymentPubKeyHash -> ScriptLookups a
 ownPaymentPubKeyHash pkh =
@@ -393,16 +384,17 @@ type ConstraintProcessingState (a :: Type) =
   -- Balance of the values produced and required for the transaction's outputs
   , datums :: Array Datum
   -- Ordered accumulation of datums so we can use to `setScriptDataHash`
-  , redeemers :: Array (T.Redeemer /\ Maybe TransactionInput)
+  , redeemersTxIns :: Array (T.Redeemer /\ Maybe TransactionInput)
   -- Ordered accumulation of redeemers so we can use to `setScriptDataHash` and
-  -- add execution units via Ogmios. Note: this mixes script and minting
-  -- redeemers.
-  , mintingPolicies :: Array MintingPolicy
-  -- An array of minting policies, we need to keep track of the index for
-  -- minting redeemers
+  -- add execution units via Ogmios
+  , mintRedeemers :: Map MintingPolicyHash T.Redeemer
+  -- Mint redeemers with the corresponding minting policy hashes.
+  -- We need to reindex mint redeemers every time we add a new one, since
+  -- indexing relies on policy id ordering.
   , lookups :: ScriptLookups a
   -- ScriptLookups for resolving constraints. Should be treated as an immutable
   -- value despite living inside the processing state
+  , costModels :: Costmdls
   }
 
 -- We could make these signatures polymorphic but they're not exported so don't
@@ -423,16 +415,20 @@ _datums
   :: forall (a :: Type). Lens' (ConstraintProcessingState a) (Array Datum)
 _datums = prop (SProxy :: SProxy "datums")
 
-_redeemers
+_costModels
+  :: forall (a :: Type). Lens' (ConstraintProcessingState a) Costmdls
+_costModels = prop (SProxy :: SProxy "costModels")
+
+_redeemersTxIns
   :: forall (a :: Type)
    . Lens' (ConstraintProcessingState a)
        (Array (T.Redeemer /\ Maybe TransactionInput))
-_redeemers = prop (SProxy :: SProxy "redeemers")
+_redeemersTxIns = prop (SProxy :: SProxy "redeemersTxIns")
 
-_mintingPolicies
+_mintRedeemers
   :: forall (a :: Type)
-   . Lens' (ConstraintProcessingState a) (Array MintingPolicy)
-_mintingPolicies = prop (SProxy :: SProxy "mintingPolicies")
+   . Lens' (ConstraintProcessingState a) (Map MintingPolicyHash T.Redeemer)
+_mintRedeemers = prop (SProxy :: SProxy "mintRedeemers")
 
 _lookups
   :: forall (a :: Type). Lens' (ConstraintProcessingState a) (ScriptLookups a)
@@ -451,11 +447,11 @@ totalMissingValue { valueSpentBalancesInputs, valueSpentBalancesOutputs } =
   missingValueSpent valueSpentBalancesInputs `join`
     missingValueSpent valueSpentBalancesOutputs
 
-provide :: Value -> ValueSpentBalances
-provide provided = ValueSpentBalances { provided, required: mempty }
+provideValue :: Value -> ValueSpentBalances
+provideValue provided = ValueSpentBalances { provided, required: mempty }
 
-require :: Value -> ValueSpentBalances
-require required = ValueSpentBalances { required, provided: mempty }
+requireValue :: Value -> ValueSpentBalances
+requireValue required = ValueSpentBalances { required, provided: mempty }
 
 -- A `StateT` ontop of `QueryM` ~ ReaderT QueryConfig Aff`.
 -- The state is `ConstraintProcessingState`, which keeps track of the unbalanced
@@ -497,14 +493,19 @@ processLookupsAndConstraints
   let
     mps = lookups.mps
     scripts = lookups.scripts
-  mpsHashes <-
-    except $ hashScripts mintingPolicyHash CannotHashMintingPolicy mps
-  validatorHashes <-
-    except $ hashScripts validatorHash CannotHashValidator scripts
+  mpsHashes <- ExceptT $
+    hashScripts mintingPolicyHash CannotHashMintingPolicy mps
+  validatorHashes <- ExceptT $
+    hashScripts validatorHash CannotHashValidator scripts
   let
     mpsMap = fromFoldable $ zip mpsHashes mps
     osMap = fromFoldable $ zip validatorHashes scripts
   ExceptT $ foldConstraints (processConstraint mpsMap osMap) constraints
+
+  -- Attach mint redeemers to witness set.
+  mintRedeemers :: Array _ <- use _mintRedeemers <#> Map.toUnfoldable
+  lift $ traverse_ (attachToCps attachRedeemer <<< snd) mintRedeemers
+
   ExceptT $ foldConstraints addOwnInput ownInputs
   ExceptT $ foldConstraints addOwnOutput ownOutputs
   ExceptT addScriptDataHash
@@ -515,12 +516,12 @@ processLookupsAndConstraints
   -- with a way to error.
   hashScripts
     :: forall (script :: Type) (scriptHash :: Type) (c :: Type)
-     . (script -> Maybe scriptHash)
+     . (script -> Aff (Maybe scriptHash))
     -> (script -> MkUnbalancedTxError)
     -> Array script
-    -> Either MkUnbalancedTxError (Array scriptHash)
+    -> ConstraintsM c (Either MkUnbalancedTxError (Array scriptHash))
   hashScripts hasher error =
-    traverse (\s -> note (error s) (hasher s))
+    liftAff <<< map sequence <<< traverse (\s -> note (error s) <$> hasher s)
 
   -- Don't write the output in terms of ExceptT because we can't write a
   -- partially applied `ConstraintsM` meaning this is more readable.
@@ -544,7 +545,8 @@ runConstraintsM
   => ScriptLookups a
   -> TxConstraints b b
   -> QueryM (Either MkUnbalancedTxError (ConstraintProcessingState a))
-runConstraintsM lookups txConstraints =
+runConstraintsM lookups txConstraints = do
+  costModels <- getProtocolParameters <#> unwrap >>> _.costModels
   let
     initCps :: ConstraintProcessingState a
     initCps =
@@ -554,9 +556,10 @@ runConstraintsM lookups txConstraints =
       , valueSpentBalancesOutputs:
           ValueSpentBalances { required: mempty, provided: mempty }
       , datums: mempty
-      , redeemers: mempty
-      , mintingPolicies: mempty
+      , redeemersTxIns: mempty
+      , mintRedeemers: empty
       , lookups
+      , costModels
       }
 
     unpackTuple
@@ -564,10 +567,8 @@ runConstraintsM lookups txConstraints =
       -> Either MkUnbalancedTxError (ConstraintProcessingState a)
     unpackTuple (Left err /\ _) = Left err
     unpackTuple (_ /\ cps) = Right cps
-  in
-    unpackTuple <$>
-      ( flip runStateT initCps $ processLookupsAndConstraints txConstraints
-      )
+  unpackTuple <$>
+    flip runStateT initCps (processLookupsAndConstraints txConstraints)
 
 -- See comments in `processLookupsAndConstraints` regarding constraints.
 -- | Create an `UnbalancedTx` given `ScriptLookups` and `TxConstraints`.
@@ -620,7 +621,7 @@ mkUnbalancedTx
   -> QueryM (Either MkUnbalancedTxError UnattachedUnbalancedTx)
 mkUnbalancedTx scriptLookups txConstraints =
   runConstraintsM scriptLookups txConstraints <#> map
-    \{ unbalancedTx, datums, redeemers } ->
+    \{ unbalancedTx, datums, redeemersTxIns } ->
       let
         stripScriptDataHash :: UnbalancedTx -> UnbalancedTx
         stripScriptDataHash uTx =
@@ -632,17 +633,19 @@ mkUnbalancedTx scriptLookups txConstraints =
             _ { plutusData = Nothing, redeemers = Nothing }
         tx = stripDatumsRedeemers $ stripScriptDataHash unbalancedTx
       in
-        wrap { unbalancedTx: tx, datums, redeemersTxIns: redeemers }
+        wrap { unbalancedTx: tx, datums, redeemersTxIns }
 
 addScriptDataHash
   :: forall (a :: Type)
    . ConstraintsM a (Either MkUnbalancedTxError Unit)
 addScriptDataHash = runExceptT do
   dats <- use _datums
+  costModels <- use _costModels
   -- Use both script and minting redeemers in the order they were appended.
-  reds <- use (_redeemers <<< to (map fst))
+  reds <- use (_redeemersTxIns <<< to (map fst))
   tx <- use (_unbalancedTx <<< _transaction)
-  tx' <- ExceptT $ liftEffect $ setScriptDataHash reds dats tx <#> Right
+  tx' <- ExceptT $ liftEffect $ setScriptDataHash costModels reds dats tx <#>
+    Right
   _cpsToTransaction .= tx'
 
 -- | Add the remaining balance of the total value that the tx must spend.
@@ -689,11 +692,9 @@ updateUtxoIndex
 updateUtxoIndex = runExceptT do
   txOutputs <- use _lookups <#> unwrap >>> _.txOutputs
   networkId <- lift getNetworkId
-  cTxOutputs <- liftM CannotConvertFromPlutusType
-    (traverse (fromPlutusType <<< Tuple networkId) txOutputs)
-  let txOutsMap = mapMaybe transactionOutputToScriptOutput cTxOutputs
+  let cTxOutputs = map (fromPlutusTxOutput networkId) txOutputs
   -- Left bias towards original map, hence `flip`:
-  _unbalancedTx <<< _utxoIndex %= flip union txOutsMap
+  _unbalancedTx <<< _utxoIndex %= flip union cTxOutputs
 
 -- Note, we don't use the redeemer here, unlike Plutus because of our lack of
 -- `TxIn` datatype.
@@ -712,8 +713,7 @@ addOwnInput (InputConstraint { txOutRef }) = do
   runExceptT do
     ScriptLookups { txOutputs, typedValidator } <- use _lookups
     -- Convert to Cardano type
-    cTxOutputs <- liftM CannotConvertFromPlutusType
-      (traverse (fromPlutusType <<< Tuple networkId) txOutputs)
+    let cTxOutputs = map (fromPlutusTxOutput networkId) txOutputs
     inst <- liftM TypedValidatorMissing typedValidator
     -- This line is to type check the `TransactionInput`. Plutus actually creates a `TxIn`
     -- but we don't have such a datatype for our `TxBody`. Therefore, if we pass
@@ -723,8 +723,8 @@ addOwnInput (InputConstraint { txOutRef }) = do
         <#> lmap TypeCheckFailed
     let value = typedTxOutRefValue typedTxOutRef
     -- Must be inserted in order. Hopefully this matches the order under CSL
-    _cpsToTxBody <<< _inputs %= insert txOutRef
-    _valueSpentBalancesInputs <>= provide value
+    _cpsToTxBody <<< _inputs %= Set.insert txOutRef
+    _valueSpentBalancesInputs <>= provideValue value
 
 -- | Add a typed output and return its value.
 addOwnOutput
@@ -739,7 +739,7 @@ addOwnOutput (OutputConstraint { datum: d, value }) = do
   runExceptT do
     ScriptLookups { typedValidator } <- use _lookups
     inst <- liftM TypedValidatorMissing typedValidator
-    let value' = unwrap $ fromPlutusType value
+    let value' = fromPlutusValue value
     typedTxOut <- except $ mkTypedTxOut networkId inst d value'
       # note MkTypedTxOutFailed
     let txOut = typedTxOutTxOut typedTxOut
@@ -750,7 +750,7 @@ addOwnOutput (OutputConstraint { datum: d, value }) = do
       ExceptT $ lift $ getDatumByHash dHash <#> note (CannotQueryDatum dHash)
     _cpsToTxBody <<< _outputs %= Array.(:) txOut
     ExceptT $ addDatum dat
-    _valueSpentBalancesOutputs <>= provide value'
+    _valueSpentBalancesOutputs <>= provideValue value'
 
 data MkUnbalancedTxError
   = TypeCheckFailed TypeCheckError
@@ -776,7 +776,6 @@ data MkUnbalancedTxError
   | CannotHashValidator Validator
   | CannotConvertPaymentPubKeyHash PaymentPubKeyHash
   | CannotSatisfyAny
-  | CannotConvertFromPlutusType
 
 derive instance Generic MkUnbalancedTxError _
 derive instance Eq MkUnbalancedTxError
@@ -792,8 +791,7 @@ lookupTxOutRef outRef = runExceptT do
   txOutputs <- use _lookups <#> unwrap >>> _.txOutputs
   txOut <- liftM (TxOutRefNotFound outRef) (lookup outRef txOutputs)
   networkId <- lift getNetworkId
-  liftM CannotConvertFromPlutusType $
-    fromPlutusType (networkId /\ txOut)
+  pure $ fromPlutusTxOutput networkId txOut
 
 lookupDatum
   :: forall (a :: Type)
@@ -822,6 +820,18 @@ lookupValidator vh osMap = do
   let err = pure $ throwError $ ValidatorHashNotFound vh
   maybe err (pure <<< Right) $ lookup vh osMap
 
+reindexMintRedeemers
+  :: forall (a :: Type)
+   . MintingPolicyHash
+  -> T.Redeemer
+  -> ConstraintsM a (Array T.Redeemer)
+reindexMintRedeemers mpsHash redeemer = do
+  _mintRedeemers %= Map.insert mpsHash redeemer
+  mintRedeemers :: Array _ <- use _mintRedeemers <#> Map.toUnfoldable
+  pure $
+    mintRedeemers # mapWithIndex \ix (_ /\ T.Redeemer red) ->
+      T.Redeemer red { index = fromInt ix }
+
 -- | Modify the `UnbalancedTx` so that it satisfies the constraints, if
 -- | possible. Fails if a hash is missing from the lookups, or if an output
 -- | of the wrong type is spent.
@@ -848,19 +858,18 @@ processConstraint mpsMap osMap = do
             { ttl = timeToLive
             , validityStartInterval = validityStartInterval
             }
-    MustBeSignedBy pkh -> runExceptT do
-      ppkh <- use _lookups <#> unwrap >>> _.paymentPubKeyHashes
-      sigs <- for (lookup pkh ppkh) $
-        payPubKeyRequiredSigner >>>
-          maybe (throwError (CannotConvertPaymentPubKeyHash pkh))
-            (pure <<< Array.singleton)
-      _cpsToTxBody <<< _requiredSigners <>= sigs
+    MustBeSignedBy pkh -> runExceptT $
+      -- FIXME This is incompatible with Plutus' version, which requires
+      -- the corresponding `paymentPubKey` lookup. In the next major version,
+      -- we might wish to revise this
+      -- See https://github.com/Plutonomicon/cardano-transaction-lib/issues/569
+      _cpsToTxBody <<< _requiredSigners <>= Just [ wrap $ unwrap $ unwrap pkh ]
     MustSpendAtLeast plutusValue -> do
-      let value = unwrap $ fromPlutusType plutusValue
-      runExceptT $ _valueSpentBalancesInputs <>= require value
+      let value = fromPlutusValue plutusValue
+      runExceptT $ _valueSpentBalancesInputs <>= requireValue value
     MustProduceAtLeast plutusValue -> do
-      let value = unwrap $ fromPlutusType plutusValue
-      runExceptT $ _valueSpentBalancesOutputs <>= require value
+      let value = fromPlutusValue plutusValue
+      runExceptT $ _valueSpentBalancesOutputs <>= requireValue value
     MustSpendPubKeyOutput txo -> runExceptT do
       txOut <- ExceptT $ lookupTxOutRef txo
       -- Recall an Ogmios datum is a `Maybe String` where `Nothing` implies a
@@ -870,8 +879,8 @@ processConstraint mpsMap osMap = do
           -- POTENTIAL FIX ME: Plutus has Tx.TxIn and Tx.PubKeyTxIn -- TxIn
           -- keeps track TransactionInput and TxInType (the input type, whether
           -- consuming script, public key or simple script)
-          _cpsToTxBody <<< _inputs %= insert txo
-          _valueSpentBalancesInputs <>= provide amount
+          _cpsToTxBody <<< _inputs %= Set.insert txo
+          _valueSpentBalancesInputs <>= provideValue amount
         _ -> liftEither $ throwError $ TxOutRefWrongType txo
     MustSpendScriptOutput txo red -> runExceptT do
       txOut <- ExceptT $ lookupTxOutRef txo
@@ -895,7 +904,7 @@ processConstraint mpsMap osMap = do
               lookupD <- lookupDatum dHash
               pure $ queryD <|> lookupD
             ExceptT $ attachToCps attachPlutusScript plutusScript
-            _cpsToTxBody <<< _inputs %= insert txo
+            _cpsToTxBody <<< _inputs %= Set.insert txo
             ExceptT $ addDatum dataValue
             let
               -- Create a redeemer with hardcoded execution units then call Ogmios
@@ -908,9 +917,9 @@ processConstraint mpsMap osMap = do
                 , data: unwrap red
                 , exUnits: scriptExUnits
                 }
-            _valueSpentBalancesInputs <>= provide amount
+            _valueSpentBalancesInputs <>= provideValue amount
             -- Append redeemer for spending to array.
-            _redeemers <>= Array.singleton (redeemer /\ Just txo)
+            _redeemersTxIns <>= Array.singleton (redeemer /\ Just txo)
             -- Attach redeemer to witness set.
             ExceptT $ attachToCps attachRedeemer redeemer
         _ -> liftEither $ throwError $ TxOutRefWrongType txo
@@ -927,38 +936,34 @@ processConstraint mpsMap osMap = do
       mintVal <-
         if i < zero then do
           v <- liftM (CannotMakeValue cs tn i) (value $ negate i)
-          _valueSpentBalancesInputs <>= provide v
+          _valueSpentBalancesInputs <>= provideValue v
           liftEither $ Right $ map getNonAdaAsset $ value i
         else do
           v <- liftM (CannotMakeValue cs tn i) (value i)
-          _valueSpentBalancesOutputs <>= provide v
+          _valueSpentBalancesOutputs <>= provideValue v
           liftEither $ Right $ map getNonAdaAsset $ value i
       ExceptT $ attachToCps attachPlutusScript plutusScript
-      -- Use a separate redeeming order on minting policies.
-      _mintingPolicies <>= Array.singleton (wrap plutusScript)
-      mIndex <-
-        use
-          ( _mintingPolicies <<< to
-              (elemIndex (wrap plutusScript) >>> map fromInt)
-          )
-      index <- liftM CannotGetMintingPolicyScriptIndex mIndex
       let
         -- Create a redeemer with zero execution units then call Ogmios to
         -- add the units in at the very end.
+        -- Hardcode minting policy index, then reindex with
+        -- `reindexMintRedeemers`.
         redeemer = T.Redeemer
           { tag: Mint
-          , index
+          , index: zero
           , data: unwrap red
           , exUnits: mintExUnits
           }
+      -- Remove mint redeemers from array before reindexing.
+      _redeemersTxIns %= filter \(T.Redeemer { tag } /\ _) -> tag /= Mint
+      -- Reindex mint redeemers.
+      mintRedeemers <- lift $ reindexMintRedeemers mpsHash redeemer
+      -- Append reindexed mint redeemers to array.
+      _redeemersTxIns <>= map (_ /\ Nothing) mintRedeemers
       _cpsToTxBody <<< _mint <>= map wrap mintVal
-      -- Append redeemer for minting to array.
-      _redeemers <>= Array.singleton (redeemer /\ Nothing)
-      -- Attach redeemer to witness set.
-      ExceptT $ attachToCps attachRedeemer redeemer
     MustPayToPubKeyAddress pkh skh mDatum plutusValue -> do
       networkId <- getNetworkId
-      let amount = unwrap $ fromPlutusType plutusValue
+      let amount = fromPlutusValue plutusValue
       runExceptT do
         -- If datum is presented, add it to 'datumWitnesses' and Array of datums.
         -- Otherwise continue, hence `liftEither $ Right unit`.
@@ -1005,10 +1010,10 @@ processConstraint mpsMap osMap = do
             , dataHash
             }
         _cpsToTxBody <<< _outputs %= Array.(:) txOut
-        _valueSpentBalancesOutputs <>= provide amount
+        _valueSpentBalancesOutputs <>= provideValue amount
     MustPayToScript vlh dat plutusValue -> do
       networkId <- getNetworkId
-      let amount = unwrap $ fromPlutusType plutusValue
+      let amount = fromPlutusValue plutusValue
       runExceptT do
         -- Don't write `let dataHash = datumHash datum`, see [datumHash Note]
         dataHash <- except $ note (CannotHashDatum dat)
@@ -1022,7 +1027,7 @@ processConstraint mpsMap osMap = do
         -- Note we don't `addDatum` as this included as part of `mustPayToScript`
         -- constraint already.
         _cpsToTxBody <<< _outputs %= Array.(:) txOut
-        _valueSpentBalancesOutputs <>= provide amount
+        _valueSpentBalancesOutputs <>= provideValue amount
     MustHashDatum dh dt -> do
       let mdh = Hashing.datumHash dt
       if mdh == Just dh then addDatum dt

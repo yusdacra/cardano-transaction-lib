@@ -2,13 +2,16 @@
 
 var lib;
 if (typeof BROWSER_RUNTIME != 'undefined' && BROWSER_RUNTIME) {
-    lib = require('@ngua/cardano-serialization-lib-browser');
+    lib = require('@emurgo/cardano-serialization-lib-browser');
 } else {
-    lib = require('@ngua/cardano-serialization-lib-nodejs');
+    lib = require('@emurgo/cardano-serialization-lib-nodejs');
 }
 
 const setter = prop => obj => value => () =>
       obj['set_' + prop](value);
+
+exports.hashTransaction = body => () =>
+    lib.hash_transaction(body);
 
 exports.newBigNum = maybe => string => {
     try {
@@ -44,20 +47,17 @@ exports.newTransactionOutputs = () =>
 exports.addTransactionOutput = outputs => output => () =>
     outputs.add(output);
 
-exports.newTransactionBody = inputs => outputs => fee => ttl => () =>
-    lib.TransactionBody.new(inputs, outputs, fee, ttl);
-
-exports.newTransaction = body => witness_set => () =>
-    lib.Transaction.new(body, witness_set);
+exports.newTransactionBody = inputs => outputs => fee => () =>
+    lib.TransactionBody.new_tx_body(inputs, outputs, fee);
 
 exports.setTxIsValid = tx => isValid => () =>
     tx.set_is_valid(isValid);
 
-exports.newTransaction_ = body => witness_set => auxiliary_data => () =>
+exports.newTransaction = body => witness_set => auxiliary_data => () =>
     lib.Transaction.new(body, witness_set, auxiliary_data);
 
-exports.newTransactionWitnessSet = () =>
-    lib.TransactionWitnessSet.new();
+exports.newTransaction_ = body => witness_set => () =>
+    lib.Transaction.new(body, witness_set);
 
 exports.newTransactionUnspentOutputFromBytes = bytes => () =>
     lib.TransactionUnspentOutput.from_bytes(bytes);
@@ -85,6 +85,9 @@ exports.transactionOutputSetDataHash = setter('data_hash');
 exports.newVkeywitnesses = () =>
     lib.Vkeywitnesses.new();
 
+exports.makeVkeywitness = hash => key => () =>
+    lib.make_vkey_witness(hash, key);
+
 exports.newVkeywitness = vkey => signature => () =>
     lib.Vkeywitness.new(vkey, signature);
 
@@ -97,6 +100,18 @@ exports.newVkeyFromPublicKey = public_key => () =>
 exports._publicKeyFromBech32 = maybe => bech32 => {
     try {
         return maybe.just(lib.PublicKey.from_bech32(bech32));
+    } catch (_) {
+        return maybe.nothing;
+    }
+};
+
+exports.publicKeyFromPrivateKey = private_key => () => {
+    return private_key.to_public();
+};
+
+exports._privateKeyFromBytes = maybe => bytes => {
+    try {
+        return maybe.just(lib.PrivateKey.from_normal_bytes(bytes));
     } catch (_) {
         return maybe.nothing;
     }
@@ -129,8 +144,14 @@ exports.newPlutusV1 = () =>
 exports.newInt32 = x => () =>
     lib.Int.new_i32(x);
 
-exports._hashScriptData = rs => cms => ds => () =>
-    lib.hash_script_data(rs, cms, ds);
+exports._hashScriptData = rs => cms => ds => () => {
+    const list = lib.PlutusList.new();
+    ds.forEach(d => list.add(d));
+    return lib.hash_script_data(rs, cms, list);
+};
+
+exports._hashScriptDataNoDatums = rs => cms => () =>
+    lib.hash_script_data(rs, cms);
 
 exports.newRedeemers = () =>
     lib.Redeemers.new();
@@ -179,6 +200,8 @@ exports.networkIdTestnet = () =>
 exports.networkIdMainnet = () =>
     lib.NetworkId.mainnet();
 
+exports.setTxBodyTtl = setter('ttl');
+
 exports.setTxBodyCerts = setter('certs');
 
 exports.newCertificates = () =>
@@ -226,7 +249,7 @@ exports.transactionBodySetRequiredSigners = containerHelper => body =>
     body.set_required_signers(
         containerHelper.pack(lib.Ed25519KeyHashes, keyHashes));
 
-exports.transactionBodySetValidityStartInterval = setter('validity_start_interval');
+exports.transactionBodySetValidityStartInterval = setter('validity_start_interval_bignum');
 
 exports.transactionBodySetAuxiliaryDataHash = txBody => hashBytes => () =>
     txBody.set_auxiliary_data_hash(lib.AuxiliaryDataHash.from_bytes(hashBytes));
@@ -311,14 +334,6 @@ exports.ppuSetPoolPledgeInfluence = setter('pool_pledge_influence');
 exports.ppuSetExpansionRate = setter('expansion_rate');
 
 exports.ppuSetTreasuryGrowthRate = setter('treasury_growth_rate');
-
-exports.ppuSetD = setter('d');
-
-exports.ppuSetExtraEntropyIdentity = ppu => () =>
-    ppu.set_extra_entropy(lib.Nonce.new_identity());
-
-exports.ppuSetExtraEntropyFromHash = ppu => bytes => () =>
-    ppu.set_extra_entropy(lib.Nonce.new_from_hash(bytes));
 
 exports.newProtocolVersion = major => minor => () =>
     lib.ProtocolVersion.new(major, minor);

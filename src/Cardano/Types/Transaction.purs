@@ -69,9 +69,20 @@ module Cardano.Types.Transaction
 
 import Prelude
 
+import Aeson
+  ( class DecodeAeson
+  , class EncodeAeson
+  , JsonDecodeError(TypeMismatch)
+  , caseAesonString
+  , decodeAeson
+  , encodeAeson'
+  )
+import Cardano.Types.Value (Coin, NonAdaAsset, Value)
+import Control.Alternative ((<|>))
 import Control.Apply (lift2)
 import Data.Array (union)
 import Data.BigInt (BigInt)
+import Data.Either (Either(Left))
 import Data.Generic.Rep (class Generic)
 import Data.Lens (lens')
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -81,6 +92,8 @@ import Data.Map (Map)
 import Data.Maybe (Maybe(Nothing))
 import Data.Monoid (guard)
 import Data.Newtype (class Newtype)
+import Data.Set (Set)
+import Data.Set (union) as Set
 import Data.Show.Generic (genericShow)
 import Data.Symbol (SProxy(SProxy))
 import Data.Tuple (Tuple(Tuple))
@@ -95,8 +108,9 @@ import Serialization.Address
   , StakeCredential
   )
 import Serialization.Hash (Ed25519KeyHash)
-import Serialization.Types (BigNum, VRFKeyHash)
+import Serialization.Types (VRFKeyHash)
 import Types.Aliases (Bech32String)
+import Types.BigNum (BigNum)
 import Types.ByteArray (ByteArray)
 import Types.Int as Int
 import Types.PlutusData (PlutusData)
@@ -104,7 +118,6 @@ import Types.RedeemerTag (RedeemerTag)
 import Types.Scripts (PlutusScript)
 import Types.Transaction (DataHash, TransactionInput)
 import Types.TransactionMetadata (GeneralTransactionMetadata)
-import Cardano.Types.Value (Coin, NonAdaAsset, Value)
 
 --------------------------------------------------------------------------------
 -- `Transaction`
@@ -175,7 +188,7 @@ _auxiliaryData = lens' \(Transaction rec@{ auxiliaryData }) ->
 -- requiredSigners is an Array over `VKey`s essentially. But some comments at
 -- the bottom say it's Maybe?
 newtype TxBody = TxBody
-  { inputs :: Array TransactionInput
+  { inputs :: Set TransactionInput
   , outputs :: Array TransactionOutput
   , fee :: Coin
   , ttl :: Maybe Slot
@@ -200,7 +213,7 @@ instance Show TxBody where
 
 instance Semigroup TxBody where
   append (TxBody txB) (TxBody txB') = TxBody
-    { inputs: txB.inputs `union` txB'.inputs
+    { inputs: txB.inputs `Set.union` txB'.inputs
     , outputs: txB.outputs `union` txB'.outputs
     , fee: txB.fee <> txB'.fee
     , ttl: lift2 lowerbound txB.ttl txB'.ttl
@@ -351,7 +364,7 @@ derive instance Generic Language _
 instance Show Language where
   show = genericShow
 
-newtype CostModel = CostModel (Array UInt)
+newtype CostModel = CostModel (Array Int)
 
 derive instance Newtype CostModel _
 derive newtype instance Eq CostModel
@@ -373,6 +386,22 @@ derive instance Eq Nonce
 
 instance Show Nonce where
   show = genericShow
+
+instance DecodeAeson Nonce where
+  decodeAeson aeson = (HashNonce <$> decodeAeson aeson) <|>
+    caseAesonString err
+      ( case _ of
+          "neutral" -> pure IdentityNonce
+          _ -> err
+      )
+      aeson
+    where
+    err :: Either JsonDecodeError Nonce
+    err = Left (TypeMismatch "Nonce")
+
+instance EncodeAeson Nonce where
+  encodeAeson' IdentityNonce = encodeAeson' "neutral"
+  encodeAeson' (HashNonce hash) = encodeAeson' hash
 
 type UnitInterval =
   { numerator :: BigNum
@@ -496,7 +525,7 @@ data Certificate
       , pledge :: BigNum
       , cost :: BigNum
       , margin :: UnitInterval
-      , reward_account :: RewardAddress
+      , rewardAccount :: RewardAddress
       , poolOwners :: Array Ed25519KeyHash
       , relays :: Array Relay
       , poolMetadata :: Maybe PoolMetadata
@@ -521,7 +550,7 @@ instance Show Certificate where
 --------------------------------------------------------------------------------
 -- `TxBody` Lenses
 --------------------------------------------------------------------------------
-_inputs :: Lens' TxBody (Array TransactionInput)
+_inputs :: Lens' TxBody (Set TransactionInput)
 _inputs = _Newtype <<< prop (SProxy :: SProxy "inputs")
 
 _outputs :: Lens' TxBody (Array TransactionOutput)
@@ -655,6 +684,7 @@ newtype Vkeywitness = Vkeywitness (Vkey /\ Ed25519Signature)
 
 derive instance Generic Vkeywitness _
 derive newtype instance Eq Vkeywitness
+derive instance Newtype Vkeywitness _
 
 instance Show Vkeywitness where
   show = genericShow

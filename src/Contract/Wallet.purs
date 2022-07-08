@@ -1,23 +1,25 @@
 -- | A module with Wallet-related functionality.
 module Contract.Wallet
-  ( mkNamiWallet
+  ( mkKeyWalletFromPrivateKey
   , module ContractAddress
   , module Wallet
+  , module Serialization
   ) where
 
-import Contract.Monad (Contract)
-import Effect.Aff.Class (liftAff)
+import Contract.Address (getWalletAddress, getWalletCollateral) as ContractAddress
+import Data.Maybe (Maybe)
+import Serialization (privateKeyFromBytes) as Serialization
 import Wallet
-  ( NamiConnection
-  , NamiWallet
-  , Wallet(Nami)
+  ( Cip30Connection
+  , Cip30Wallet
+  , Wallet(Gero, Nami)
   , mkNamiWalletAff
+  , mkGeroWalletAff
   ) as Wallet
-import Contract.Address
-  ( getWalletAddress
-  , getWalletCollateral
-  ) as ContractAddress
+import Wallet (mkKeyWallet)
+import Wallet.Key (KeyWallet, privateKeysToKeyWallet) as Wallet
+import Wallet.Key (PrivatePaymentKey, PrivateStakeKey)
 
--- | Make a wallet lifted into `Contract` from `Aff`.
-mkNamiWallet :: forall (r :: Row Type). Contract r Wallet.Wallet
-mkNamiWallet = liftAff Wallet.mkNamiWalletAff
+mkKeyWalletFromPrivateKey
+  :: PrivatePaymentKey -> Maybe PrivateStakeKey -> Wallet.Wallet
+mkKeyWalletFromPrivateKey = mkKeyWallet

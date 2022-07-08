@@ -5,7 +5,11 @@ module Examples.Pkh2Pkh (main) where
 
 import Contract.Prelude
 
-import Contract.Address (NetworkId(TestnetId), ownPaymentPubKeyHash)
+import Contract.Address
+  ( NetworkId(TestnetId)
+  , ownPaymentPubKeyHash
+  , ownStakePubKeyHash
+  )
 import Contract.Monad
   ( ConfigParams(ConfigParams)
   , LogLevel(Trace)
@@ -20,11 +24,7 @@ import Contract.Monad
   , runContract_
   )
 import Contract.ScriptLookups as Lookups
-import Contract.Transaction
-  ( BalancedSignedTransaction(BalancedSignedTransaction)
-  , balanceAndSignTx
-  , submit
-  )
+import Contract.Transaction (balanceAndSignTx, submit)
 import Contract.TxConstraints as Constraints
 import Contract.Value as Value
 import Contract.Wallet (mkNamiWalletAff)
@@ -46,10 +46,11 @@ main = launchAff_ $ do
   runContract_ cfg $ do
     logInfo' "Running Examples.Pkh2Pkh"
     pkh <- liftedM "Failed to get own PKH" ownPaymentPubKeyHash
+    skh <- liftedM "Failed to get own SKH" ownStakePubKeyHash
 
     let
       constraints :: Constraints.TxConstraints Void Void
-      constraints = Constraints.mustPayToPubKey pkh
+      constraints = Constraints.mustPayToPubKeyAddress pkh skh
         $ Value.lovelaceValueOf
         $ BigInt.fromInt 2_000_000
 
@@ -57,7 +58,8 @@ main = launchAff_ $ do
       lookups = mempty
 
     ubTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
-    BalancedSignedTransaction bsTx <-
+    bsTx <-
       liftedM "Failed to balance/sign tx" $ balanceAndSignTx ubTx
-    txId <- submit bsTx.signedTxCbor
+    txId <- submit bsTx
     logInfo' $ "Tx ID: " <> show txId
+

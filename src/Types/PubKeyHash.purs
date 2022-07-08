@@ -15,18 +15,23 @@ import Prelude
 
 import Aeson
   ( class DecodeAeson
+  , class EncodeAeson
   , JsonDecodeError(TypeMismatch)
   , caseAesonObject
   , decodeAeson
+  , encodeAeson'
   , getField
   )
+import Aeson.Decode as Decode
+import Aeson.Encode as Encode
 import Data.Either (Either(Left))
 import Data.Generic.Rep (class Generic)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
 import FromData (class FromData)
 import Metadata.FromMetadata (class FromMetadata)
 import Metadata.ToMetadata (class ToMetadata)
+import Record (get)
 import Serialization.Address
   ( Address
   , EnterpriseAddress
@@ -36,12 +41,13 @@ import Serialization.Address
   , enterpriseAddress
   , enterpriseAddressToAddress
   , keyHashCredential
-  , pubKeyAddress
+  , paymentKeyHashStakeKeyHashAddress
   , rewardAddress
   , rewardAddressToAddress
   )
 import Serialization.Hash (Ed25519KeyHash)
 import ToData (class ToData)
+import Type.Proxy (Proxy(Proxy))
 
 newtype PubKeyHash = PubKeyHash Ed25519KeyHash
 
@@ -57,12 +63,18 @@ derive newtype instance ToMetadata PubKeyHash
 instance Show PubKeyHash where
   show = genericShow
 
--- This is needed for `ApplyArgs`. Plutus has an `getPubKeyHash` field so don't
--- newtype derive.
+-- NOTE: mlabs-haskell/purescript-bridge generated and applied here
+instance EncodeAeson PubKeyHash where
+  encodeAeson' x = encodeAeson' $ Encode.encode
+    (Encode.record { getPubKeyHash: Encode.value :: _ (Ed25519KeyHash) })
+    { getPubKeyHash: unwrap x }
+
 instance DecodeAeson PubKeyHash where
-  decodeAeson = caseAesonObject
-    (Left $ TypeMismatch "Expected object")
-    (flip getField "getPubKeyHash" >=> decodeAeson >>> map PubKeyHash)
+  decodeAeson = map (wrap <<< get (Proxy :: Proxy "getPubKeyHash")) <<<
+    Decode.decode
+      ( Decode.record "getPubKeyHash "
+          { getPubKeyHash: Decode.value :: _ (Ed25519KeyHash) }
+      )
 
 ed25519EnterpriseAddress
   :: forall (n :: Type)
@@ -90,7 +102,8 @@ ed25519RewardAddress network skh =
 
 pubKeyHashBaseAddress :: NetworkId -> PubKeyHash -> StakePubKeyHash -> Address
 pubKeyHashBaseAddress networkId pkh skh =
-  baseAddressToAddress $ pubKeyAddress networkId (unwrap pkh)
+  baseAddressToAddress $ paymentKeyHashStakeKeyHashAddress networkId
+    (unwrap pkh)
     (unwrap $ unwrap skh)
 
 pubKeyHashRewardAddress :: NetworkId -> PubKeyHash -> Address
@@ -116,11 +129,9 @@ instance Show PaymentPubKeyHash where
 -- This is needed for `ApplyArgs`. Plutus has an `unPaymentPubKeyHash` field so
 -- don't newtype derive.
 instance DecodeAeson PaymentPubKeyHash where
-  decodeAeson = caseAesonObject
-    (Left $ TypeMismatch "Expected object")
-    ( flip getField "unPaymentPubKeyHash" >=>
-        decodeAeson >>> map PaymentPubKeyHash
-    )
+  decodeAeson = caseAesonObject (Left $ TypeMismatch "Expected object")
+    $ flip getField "unPaymentPubKeyHash" >=> decodeAeson >>> map
+        PaymentPubKeyHash
 
 newtype StakePubKeyHash = StakePubKeyHash PubKeyHash
 

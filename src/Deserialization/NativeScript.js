@@ -2,9 +2,9 @@
 
 var lib;
 if (typeof BROWSER_RUNTIME != 'undefined' && BROWSER_RUNTIME) {
-    lib = require('@ngua/cardano-serialization-lib-browser');
+    lib = require('@emurgo/cardano-serialization-lib-browser');
 } else {
-    lib = require('@ngua/cardano-serialization-lib-nodejs');
+    lib = require('@emurgo/cardano-serialization-lib-nodejs');
 }
 
 const getNativeScriptAs = prop => maybe => ns => {
@@ -25,5 +25,5 @@ exports.scriptAllScripts = helper => helper.unpackFromProperty('native_scripts')
 exports.scriptAnyScripts = helper => helper.unpackFromProperty('native_scripts');
 exports.scriptNOfKScripts = helper => helper.unpackFromProperty('native_scripts');
 exports.scriptNOfK_n = call('n');
-exports.timelockStart_slot = call('slot');
-exports.timelockExpiry_slot = call('slot');
+exports.timelockStart_slot = call('slot_bignum');
+exports.timelockExpiry_slot = call('slot_bignum');
