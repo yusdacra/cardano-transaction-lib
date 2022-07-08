@@ -20,7 +20,11 @@ module BalanceTx
       , EvalExUnitsAndMinFeeError'
       , TxInputLockedError'
       )
-  , BalanceTxInsError(InsufficientTxInputs, BalanceTxInsCannotMinus)
+  , BalanceTxInsError
+      ( InsufficientTxInputs
+      , BalanceTxInsCannotMinus
+      , UtxoLookupFailedFor
+      )
   , CannotMinusError(CannotMinus)
   , EvalExUnitsAndMinFeeError
       ( EvalMinFeeError
@@ -771,6 +775,7 @@ calculateMinUtxo coinsPerUtxoByte txOut =
       else utxoEntrySizeWithoutVal
         + size outputValue
         + dataHashSize txOut'.dataHash
+        + fromInt 5
 
 -- https://github.com/input-output-hk/cardano-ledger/blob/master/doc/explanations/min-utxo-alonzo.rst
 -- | Calculates how many words are needed depending on whether the datum is
